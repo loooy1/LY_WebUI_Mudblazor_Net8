@@ -1,10 +1,83 @@
-﻿<MudNavMenu>
-    <MudNavLink Href="/" Match="NavLinkMatch.All">Dashboard</MudNavLink>
-    <MudNavLink Href="/test" Match="NavLinkMatch.Prefix">Test</MudNavLink>
-    <MudNavLink Href="/form" Match="NavLinkMatch.Prefix">Form</MudNavLink>
-    <MudNavGroup Title="Settings" Expanded="true">
-        <MudNavLink Href="/users"  Match="NavLinkMatch.Prefix">Users</MudNavLink>
-        <MudNavLink Href="/security"  Match="NavLinkMatch.Prefix">Security</MudNavLink>
-    </MudNavGroup>
-    <MudNavLink Href="/about"  Match="NavLinkMatch.Prefix">About</MudNavLink>
-</MudNavMenu>
+﻿@using MudBlazor
+
+<MudPaper Class="my-nav-shell" Elevation="0" Square="true">
+    <MudText Typo="Typo.overline" Class="px-3 pt-2 pb-1 nav-caption">Navigation</MudText>
+    <MudDivider Class="mb-2" />
+
+    <MudNavMenu Class="my-nav-menu">
+        @* 主页 *@
+        <MudNavLink Href="/"
+                    Match="NavLinkMatch.All"
+                    Icon="@Icons.Material.Filled.Dashboard"
+                    Class="my-nav-link">
+            Dashboard
+        </MudNavLink>
+        
+        @* 测试界面 *@
+        <MudNavLink Href="/test"
+                    Match="NavLinkMatch.Prefix"
+                    Icon="@Icons.Material.Filled.Science"
+                    Class="my-nav-link">
+            Test
+        </MudNavLink>
+
+        @* WCS模拟器 *@
+        <MudNavLink Href="/wcs-simulation/base"
+                    Match="NavLinkMatch.Prefix"
+                    Icon="@Icons.Material.Filled.Science"
+                    Class="my-nav-link">
+            WCS模拟器
+        </MudNavLink>
+
+        @* WCS模拟器配置 *@
+        <MudNavLink Href="/wcs-simulation/config"
+                    Match="NavLinkMatch.Prefix"
+                    Icon="@Icons.Material.Filled.Settings"
+                    Class="my-nav-link">
+            WCS模拟器配置
+        </MudNavLink>
+
+        @* 错误界面 *@
+        <MudNavLink Href="/error"
+                    Match="NavLinkMatch.Prefix"
+                    Icon="@Icons.Material.Filled.ErrorOutline"
+                    Class="my-nav-link">
+            Error
+        </MudNavLink>
+    </MudNavMenu>
+</MudPaper>
+
+<style>
+    .my-nav-shell {
+        padding: 8px 10px 10px;
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(255,255,255,.02) 0%, rgba(255,255,255,0) 100%);
+    }
+
+    .nav-caption {
+        letter-spacing: .08em;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .my-nav-menu {
+        gap: 4px;
+    }
+
+    .my-nav-link {
+        border-radius: 12px;
+        margin: 3px 0;
+        padding: 8px 10px;
+        transition: all .2s ease;
+    }
+
+    .my-nav-link:hover {
+        background-color: rgba(var(--mud-palette-primary-rgb), .08);
+        transform: translateX(2px);
+    }
+
+    .my-nav-link.active {
+        background-color: rgba(var(--mud-palette-primary-rgb), .14);
+        color: var(--mud-palette-primary);
+        font-weight: 600;
+    }
+</style>

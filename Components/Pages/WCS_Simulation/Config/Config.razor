@@ -1,0 +1,73 @@
+﻿@page "/wcs-simulation/config"
+@using MudBlazor
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Models
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Services
+@inject IApiDispatchConfigReader ConfigReader
+@inject IApiDispatchConfigWriter ConfigWriter
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4">
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5">WCS 接口配置</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+
+        <MudCardContent>
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudTextField Label="接口 BaseUrl" Variant="Variant.Outlined" @bind-Value="_config.BaseUrl" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField Label="下发路径 Path" Variant="Variant.Outlined" @bind-Value="_config.DispatchPath" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" Label="HTTP Method" Variant="Variant.Outlined" @bind-Value="_config.HttpMethod">
+                        <MudSelectItem T="string" Value="@("POST")">POST</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("PUT")">PUT</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="int" Label="超时(秒)" Variant="Variant.Outlined" Min="1" @bind-Value="_config.TimeoutSeconds" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="_config.UseBearerToken" Color="Color.Primary">使用 Bearer Token</MudSwitch>
+                </MudItem>
+
+                @if (_config.UseBearerToken)
+                {
+                    <MudItem xs="12">
+                        <MudTextField Label="Bearer Token" InputType="InputType.Password" Variant="Variant.Outlined" @bind-Value="_config.BearerToken" />
+                    </MudItem>
+                }
+            </MudGrid>
+
+            <MudStack Row="true" Spacing="2" Class="mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">保存</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="Reload">重新加载</MudButton>
+            </MudStack>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private ApiDispatchConfig _config = new();
+
+    protected override void OnInitialized()
+    {
+        Reload();
+    }
+
+    private void Reload()
+    {
+        _config = ConfigReader.Get();
+    }
+
+    private void Save()
+    {
+        ConfigWriter.Save(_config);
+        Snackbar.Add("接口配置已保存", Severity.Success);
+    }
+}

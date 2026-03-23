@@ -1,0 +1,451 @@
+﻿@page "/wcs-simulation/base"
+
+@using MudBlazor
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Models
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services
+
+@inject IWcsTaskHttpService TaskHttpService
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-4 wcs-page">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.h4">WCS 任务下发模拟台</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">用于模拟 WCS 向其他系统下发任务（当前为硬编码数据）</MudText>
+        </MudStack>
+        <MudChip T="string" Color="Color.Info" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Memory">Simulation Mode</MudChip>
+    </MudStack>
+
+    <MudGrid Spacing="3">
+        <!-- 参数配置 -->
+        <MudItem xs="12" md="4" Class="top-module">
+            <MudCard Class="modern-card h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Tune" Class="mr-2" />
+                            参数配置
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="module-scroll">
+                    <MudStack Spacing="2">
+                        <MudSelect T="string" Label="目标系统" Variant="Variant.Outlined" Dense="true" @bind-Value="_config.TargetSystem">
+                            @foreach (var s in _targetSystems)
+                            {
+                                <MudSelectItem T="string" Value="@s">@s</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudSelect T="string" Label="任务类型默认值" Variant="Variant.Outlined" Dense="true" @bind-Value="_config.DefaultTaskType">
+                            @foreach (var t in _taskTypes)
+                            {
+                                <MudSelectItem T="string" Value="@t">@t</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudSelect T="int" Label="默认优先级" Variant="Variant.Outlined" Dense="true" @bind-Value="_config.DefaultPriority">
+                            @for (var i = 1; i <= 5; i++)
+                            {
+                                <MudSelectItem T="int" Value="@i">@i</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudNumericField T="int" Label="重试次数" Variant="Variant.Outlined" Dense="true" Min="0" Max="10" @bind-Value="_config.RetryCount" />
+                        <MudNumericField T="int" Label="超时（秒）" Variant="Variant.Outlined" Dense="true" Min="10" Max="600" @bind-Value="_config.TimeoutSeconds" />
+                        <MudSwitch T="bool" Color="Color.Primary" @bind-Value="_config.AutoAck">自动确认回执</MudSwitch>
+
+                        <MudStack Row="true" Spacing="1" Class="mt-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="SaveConfig">保存配置</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.RestartAlt" OnClick="ResetConfig">重置</MudButton>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- 任务下发 -->
+        <MudItem xs="12" md="8" Class="top-module">
+            <MudCard Class="modern-card h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Send" Class="mr-2" />
+                            任务下发
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField Label="任务号" Variant="Variant.Outlined" Dense="true" ReadOnly="true" Value="_draft.TaskNo" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" Label="任务类型" Variant="Variant.Outlined" Dense="true" @bind-Value="_draft.TaskType">
+                                @foreach (var t in _taskTypes)
+                                {
+                                    <MudSelectItem T="string" Value="@t">@t</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudTextField Label="载具/托盘号" Variant="Variant.Outlined" Dense="true" @bind-Value="_draft.CarrierCode" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField Label="起点位" Variant="Variant.Outlined" Dense="true" @bind-Value="_draft.SourceLocation" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField Label="目标位" Variant="Variant.Outlined" Dense="true" @bind-Value="_draft.TargetLocation" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="int" Label="优先级" Variant="Variant.Outlined" Dense="true" Min="1" Max="5" @bind-Value="_draft.Priority" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="int" Label="数量" Variant="Variant.Outlined" Dense="true" Min="1" Max="9999" @bind-Value="_draft.Quantity" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4" Class="d-flex align-center">
+                            <MudSwitch T="bool" Color="Color.Primary" @bind-Value="_draft.IsUrgent">紧急任务</MudSwitch>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudStack Row="true" Spacing="1" Class="mt-3">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Material.Filled.AutoAwesome" OnClick="GenerateDraftTaskNo">生成任务号</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddTask" OnClick="AddToQueue">加入待发队列</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Publish" OnClick="SendAll">一键下发</MudButton>
+                    </MudStack>
+
+                    <MudDivider Class="my-3" />
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">待发队列（硬编码内存）</MudText>
+                    <div class="queue-scroll">
+                        <MudTable Items="_queuedTasks" Dense="true" Hover="true" Striped="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>任务号</MudTh>
+                                <MudTh>类型</MudTh>
+                                <MudTh>起点</MudTh>
+                                <MudTh>目标</MudTh>
+                                <MudTh>优先级</MudTh>
+                                <MudTh>状态</MudTh>
+                                <MudTh>操作</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="任务号">@context.TaskNo</MudTd>
+                                <MudTd DataLabel="类型">@context.TaskType</MudTd>
+                                <MudTd DataLabel="起点">@context.SourceLocation</MudTd>
+                                <MudTd DataLabel="目标">@context.TargetLocation</MudTd>
+                                <MudTd DataLabel="优先级">@context.Priority</MudTd>
+                                <MudTd DataLabel="状态">
+                                    <MudChip T="string" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled" Size="Size.Small">@context.Status</MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="操作">
+                                    <MudButton Variant="Variant.Text" Color="Color.Success" Size="Size.Small" OnClick="@(() => SendSingle(context))">下发</MudButton>
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <MudText Color="Color.Secondary">暂无待发送任务</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- 日志界面 -->
+        <MudItem xs="12" Class="bottom-module">
+            <MudCard Class="modern-card">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Class="mr-2" />
+                            日志界面
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="module-scroll">
+                    <MudStack Row="true" Spacing="1" Class="mb-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearLogs">清空日志</MudButton>
+                    </MudStack>
+
+                    <MudTable Items="_logs.OrderByDescending(x => x.Time)" Dense="true" Hover="true" Striped="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>时间</MudTh>
+                            <MudTh>级别</MudTh>
+                            <MudTh>内容</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="时间">@context.Time.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudTd>
+                            <MudTd DataLabel="级别">
+                                <MudChip T="string"  Color="@GetLogColor(context.Level)" Variant="Variant.Outlined" Size="Size.Small">@context.Level</MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="内容">@context.Message</MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Color="Color.Secondary">暂无日志</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+<style>
+    .wcs-page {
+        background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+        min-height: calc(100vh - 90px);
+    }
+
+    .modern-card {
+        border-radius: 16px;
+        backdrop-filter: blur(2px);
+        height: 100%;
+    }
+
+    /* 上面两个模块固定比例 */
+    .top-module {
+        height: 56vh;
+        min-height: 420px;
+    }
+
+    /* 下面日志模块固定比例 */
+    .bottom-module {
+        height: 30vh;
+        min-height: 260px;
+    }
+
+    /* 模块内部滚动 */
+    .module-scroll {
+        height: calc(100% - 78px); /* 预留 Header 高度 */
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 4px;
+    }
+
+    .module-scroll::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .module-scroll::-webkit-scrollbar-thumb {
+        background: rgba(120, 120, 120, .35);
+        border-radius: 8px;
+    }
+
+    .queue-scroll {
+        max-height: 220px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 4px;
+    }
+
+    .queue-scroll::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .queue-scroll::-webkit-scrollbar-thumb {
+        background: rgba(120, 120, 120, .35);
+        border-radius: 8px;
+    }
+</style>
+
+@code {
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    //支持的系统
+    private readonly List<string> _targetSystems = ["WMS", "MES", "TMS", "ERP"];
+    //支持的操作
+    private readonly List<string> _taskTypes = ["入库", "出库", "移库", "盘点", "补货"];
+    //系统配置对象
+    private SimConfig _config = new()
+    {
+        TargetSystem = "WMS",
+        DefaultTaskType = "入库",
+        DefaultPriority = 3,
+        RetryCount = 2,
+        TimeoutSeconds = 60,
+        AutoAck = true
+    };
+
+    // 待创建任务的草稿对象（任务下发模块的表单数据）
+    private DraftTask _draft = new();
+    // 待发任务队列（内存中的任务列表，硬编码存储）
+    private readonly List<QueuedTask> _queuedTasks = [];
+    // 系统日志列表（内存中的日志记录）
+    private readonly List<LogEntry> _logs = [];
+
+    // 初始化
+    protected override void OnInitialized()
+    {
+        // 生成初始任务号
+        GenerateDraftTaskNo();   
+        // 同步配置的默认任务类型
+        _draft.TaskType = _config.DefaultTaskType; 
+        // 同步配置的默认优先级
+        _draft.Priority = _config.DefaultPriority;
+        // 记录初始化日志
+        AddLog("INFO", "WCS 模拟台初始化完成");    
+    }
+
+    //保存配置
+    private void SaveConfig()
+    {
+        _draft.TaskType = _config.DefaultTaskType;
+        _draft.Priority = _config.DefaultPriority;
+        AddLog("INFO", $"配置已保存：目标系统={_config.TargetSystem}, 默认任务类型={_config.DefaultTaskType}");
+        Snackbar.Add("配置已保存", Severity.Success);
+    }
+
+	//重置配置
+    private void ResetConfig()
+    {
+        _config = new SimConfig
+        {
+            TargetSystem = "WMS",
+            DefaultTaskType = "入库",
+            DefaultPriority = 3,
+            RetryCount = 2,
+            TimeoutSeconds = 60,
+            AutoAck = true
+        };
+        AddLog("WARN", "配置已重置为默认值");
+        Snackbar.Add("已重置默认配置", Severity.Warning);
+    }
+
+    /// <summary>
+    /// 生成初始任务号
+    /// </summary>
+    private void GenerateDraftTaskNo()
+    {
+        _draft.TaskNo = $"TK{DateTime.Now:yyyyMMddHHmmssfff}";
+    }
+
+	// 将草稿任务加入待发队列
+    private void AddToQueue()
+    {
+        // 第一步：必填项校验（载具号、起点位、目标位不能为空）
+        if (string.IsNullOrWhiteSpace(_draft.CarrierCode) ||
+            string.IsNullOrWhiteSpace(_draft.SourceLocation) ||
+            string.IsNullOrWhiteSpace(_draft.TargetLocation))
+        {
+            Snackbar.Add("请填写载具号、起点位、目标位", Severity.Error);
+            AddLog("ERROR", "任务创建失败：关键字段为空");
+            return;
+        }
+
+        // 第二步：校验通过，将草稿任务转为队列任务
+        var task = new QueuedTask
+        {
+            TaskNo = _draft.TaskNo,
+            TaskType = _draft.TaskType,
+            CarrierCode = _draft.CarrierCode,
+            SourceLocation = _draft.SourceLocation,
+            TargetLocation = _draft.TargetLocation,
+            Priority = _draft.Priority,
+            Quantity = _draft.Quantity,
+            IsUrgent = _draft.IsUrgent,
+            Status = "待发送",
+            CreatedTime = DateTime.Now
+        };
+
+        // 第三步：加入队列 + 记录日志
+        _queuedTasks.Add(task);
+        AddLog("INFO", $"任务已加入队列：{task.TaskNo} -> {_config.TargetSystem}");
+
+        // 第四步：清空表单，重置为默认值，生成新任务号
+        _draft.CarrierCode = string.Empty;
+        _draft.SourceLocation = string.Empty;
+        _draft.TargetLocation = string.Empty;
+        _draft.Quantity = 1;
+        _draft.IsUrgent = false;
+        GenerateDraftTaskNo();
+
+        // 第五步：用户反馈
+        Snackbar.Add("已加入待发队列", Severity.Success);
+    }
+
+    // 单条任务下发
+    // private void SendSingle(QueuedTask task)
+    // {
+    //     if (task.Status == "已发送")
+    //         return;
+
+    //     task.Status = "已发送";
+    //     AddLog("INFO", $"任务下发成功：{task.TaskNo}，目标系统：{_config.TargetSystem}");
+    //     Snackbar.Add($"任务 {task.TaskNo} 已发送", Severity.Success);
+    // }
+
+    //单条任务下发
+    private async Task SendSingle(QueuedTask task)
+    {
+        if (task.Status == "已发送")
+            return;
+
+        var result = await TaskHttpService.SendTaskAsync(task, _config.TargetSystem);
+
+        if (!result.Success)
+        {
+            AddLog("ERROR", $"任务下发失败：{task.TaskNo}，{result.Message}");
+            Snackbar.Add(result.Message, Severity.Error);
+            return;
+        }
+
+        task.Status = "已发送";
+        AddLog("INFO", $"任务下发成功：{task.TaskNo}，目标系统：{_config.TargetSystem}");
+        Snackbar.Add($"任务 {task.TaskNo} 已发送", Severity.Success);
+    }
+
+    // 批量下发所有待发任务
+    private void SendAll()
+    {
+        var pending = _queuedTasks.Where(t => t.Status != "已发送").ToList();
+        if (pending.Count == 0)
+        {
+            Snackbar.Add("没有可发送的任务", Severity.Info);
+            return;
+        }
+
+        foreach (var task in pending)
+        {
+            task.Status = "已发送";
+            AddLog("INFO", $"任务下发成功：{task.TaskNo}，目标系统：{_config.TargetSystem}");
+        }
+
+        Snackbar.Add($"已下发 {pending.Count} 条任务", Severity.Success);
+    }
+
+	// 清空日志
+    private void ClearLogs()
+    {
+        _logs.Clear();
+        Snackbar.Add("日志已清空", Severity.Normal);
+    }
+    
+	// 添加日志记录
+    private void AddLog(string level, string message)
+    {
+        _logs.Add(new LogEntry
+        {
+            Time = DateTime.Now,
+            Level = level,
+            Message = message
+        });
+    }
+
+	// 根据任务状态返回对应的颜色
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "待发送" => Color.Warning,
+        "已发送" => Color.Success,
+        _ => Color.Default
+    };
+
+	// 根据日志级别返回对应的颜色
+    private static Color GetLogColor(string level) => level switch
+    {
+        "INFO" => Color.Info,
+        "WARN" => Color.Warning,
+        "ERROR" => Color.Error,
+        _ => Color.Default
+    };
+
+}
