@@ -4,9 +4,9 @@
     public sealed class DraftTask
     {
         public string TaskNo { get; set; } = string.Empty;
-        public string TaskType { get; set; } = "入库";
         public string CarrierCode { get; set; } = string.Empty;
         public string SourceLocation { get; set; } = string.Empty;
+        public string TransferLocation { get; set; } = string.Empty;
         public string TargetLocation { get; set; } = string.Empty;
         public int Priority { get; set; } = 3;
         public int Quantity { get; set; } = 1;

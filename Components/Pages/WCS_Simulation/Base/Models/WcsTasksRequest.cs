@@ -36,9 +36,9 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Models
         public string ContainerCode { get; set; } = string.Empty;
 
         [JsonPropertyName("StationCode")]
-        public string StationCode { get; set; } = string.Empty;
+        public List<string> StationCode { get; set; } = new List<string>();
 
         [JsonPropertyName("AreaCode")]
-        public string AreaCode { get; set; } = string.Empty;
+        public List<string> AreaCode { get; set; } = new List<string>();
     }
 }

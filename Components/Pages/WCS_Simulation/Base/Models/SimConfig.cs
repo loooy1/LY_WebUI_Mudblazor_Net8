@@ -4,10 +4,9 @@
     public sealed class SimConfig
     {
         public string TargetSystem { get; set; } = string.Empty;
-        public string DefaultTaskType { get; set; } = string.Empty;
+        public string WarehouseName { get; set; } = "Show";
+        public string TaskType { get; set; } = string.Empty;
         public int DefaultPriority { get; set; }
-        public int RetryCount { get; set; }
-        public int TimeoutSeconds { get; set; }
         public bool AutoAck { get; set; }
     }
 }

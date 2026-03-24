@@ -6,54 +6,159 @@
 @inject IApiDispatchConfigWriter ConfigWriter
 @inject ISnackbar Snackbar
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4">
-    <MudCard>
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h5">WCS 接口配置</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    <MudCard Class="config-card">
+        <MudCardContent Class="pa-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3 flex-wrap-gap">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.h6">WCS 接口配置</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">默认摘要展示，点击编辑后修改</MudText>
+                </MudStack>
 
-        <MudCardContent>
-            <MudGrid Spacing="2">
-                <MudItem xs="12">
-                    <MudTextField Label="接口 BaseUrl" Variant="Variant.Outlined" @bind-Value="_config.BaseUrl" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudTextField Label="下发路径 Path" Variant="Variant.Outlined" @bind-Value="_config.DispatchPath" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="string" Label="HTTP Method" Variant="Variant.Outlined" @bind-Value="_config.HttpMethod">
-                        <MudSelectItem T="string" Value="@("POST")">POST</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("PUT")">PUT</MudSelectItem>
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudNumericField T="int" Label="超时(秒)" Variant="Variant.Outlined" Min="1" @bind-Value="_config.TimeoutSeconds" />
-                </MudItem>
+                <MudStack Row="true" Spacing="1">
+                    @if (!_isEditing)
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Edit"
+                                   OnClick="BeginEdit">
+                            编辑
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   OnClick="Save">
+                            保存
+                        </MudButton>
 
-                <MudItem xs="12">
-                    <MudSwitch T="bool" @bind-Value="_config.UseBearerToken" Color="Color.Primary">使用 Bearer Token</MudSwitch>
-                </MudItem>
-
-                @if (_config.UseBearerToken)
-                {
-                    <MudItem xs="12">
-                        <MudTextField Label="Bearer Token" InputType="InputType.Password" Variant="Variant.Outlined" @bind-Value="_config.BearerToken" />
-                    </MudItem>
-                }
-            </MudGrid>
-
-            <MudStack Row="true" Spacing="2" Class="mt-4">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">保存</MudButton>
-                <MudButton Variant="Variant.Outlined" OnClick="Reload">重新加载</MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   StartIcon="@Icons.Material.Filled.Close"
+                                   OnClick="CancelEdit">
+                            取消
+                        </MudButton>
+                    }
+                </MudStack>
             </MudStack>
+
+            <MudPaper Class="summary-bar pa-3 mb-3" Elevation="0">
+                <MudStack Row="true" Spacing="1" Class="summary-wrap">
+                    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary">
+                        @_config.HttpMethod
+                    </MudChip>
+
+                    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Info">
+                        @_config.TimeoutSeconds 秒
+                    </MudChip>
+
+                    <MudChip T="string" Variant="Variant.Outlined" Color="@(_config.UseBearerToken ? Color.Success : Color.Default)">
+                        @(_config.UseBearerToken ? "已启用 Token" : "未启用 Token")
+                    </MudChip>
+
+                    <MudText Typo="Typo.body2" Class="summary-text">
+                        <b>BaseUrl：</b>@_config.BaseUrl
+                    </MudText>
+
+                    <MudText Typo="Typo.body2" Class="summary-text">
+                        <b>Path：</b>@_config.DispatchPath
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+
+            <MudCollapse Expanded="_isEditing">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="接口 BaseUrl"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      @bind-Value="_editConfig.BaseUrl" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="下发路径 Path"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      @bind-Value="_editConfig.DispatchPath" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect T="string"
+                                   Label="HTTP Method"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   @bind-Value="_editConfig.HttpMethod">
+                            <MudSelectItem T="string" Value="@("POST")">POST</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("PUT")">PUT</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudNumericField T="int"
+                                         Label="超时(秒)"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         Min="1"
+                                         Max="300"
+                                         @bind-Value="_editConfig.TimeoutSeconds" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6" Class="d-flex align-center">
+                        <MudSwitch T="bool"
+                                   @bind-Value="_editConfig.UseBearerToken"
+                                   Color="Color.Primary">
+                            使用 Bearer Token
+                        </MudSwitch>
+                    </MudItem>
+
+                    @if (_editConfig.UseBearerToken)
+                    {
+                        <MudItem xs="12">
+                            <MudTextField Label="Bearer Token"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          InputType="InputType.Password"
+                                          @bind-Value="_editConfig.BearerToken" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudCollapse>
         </MudCardContent>
     </MudCard>
 </MudContainer>
 
+<style>
+    .config-card {
+        border-radius: 16px;
+    }
+
+    .summary-bar {
+        border-radius: 12px;
+        background: rgba(var(--mud-palette-primary-rgb), 0.04);
+    }
+
+    .summary-wrap {
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .summary-text {
+        color: var(--mud-palette-text-primary);
+        word-break: break-all;
+    }
+
+    .flex-wrap-gap {
+        gap: 12px;
+    }
+</style>
+
 @code {
     private ApiDispatchConfig _config = new();
+    private ApiDispatchConfig _editConfig = new();
+    private bool _isEditing;
 
     protected override void OnInitialized()
     {
@@ -63,11 +168,27 @@
     private void Reload()
     {
         _config = ConfigReader.Get();
+        _editConfig = _config.Clone();
+        _isEditing = false;
+    }
+
+    private void BeginEdit()
+    {
+        _editConfig = _config.Clone();
+        _isEditing = true;
+    }
+
+    private void CancelEdit()
+    {
+        _editConfig = _config.Clone();
+        _isEditing = false;
     }
 
     private void Save()
     {
-        ConfigWriter.Save(_config);
+        ConfigWriter.Save(_editConfig);
+        _config = _editConfig.Clone();
+        _isEditing = false;
         Snackbar.Add("接口配置已保存", Severity.Success);
     }
 }
