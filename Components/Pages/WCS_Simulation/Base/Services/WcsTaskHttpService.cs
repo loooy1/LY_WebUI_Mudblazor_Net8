@@ -17,22 +17,18 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services
             try
             {
                 var config = configReader.Get();
-
-                httpClient.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
-
                 var requestUri = new Uri(new Uri(config.BaseUrl), config.DispatchPath);
 
-                //拼接站点列表，过滤掉空值
                 var stationCode = new[]
                 {
-                        task.SourceLocation,   // 起点
-                        task.TransferLocation, // 接驳点
-                        task.TargetLocation    // 终点
+                    task.SourceLocation,
+                    task.TransferLocation,
+                    task.TargetLocation
                 }
                 .Where(loc => !string.IsNullOrWhiteSpace(loc))
                 .ToList();
 
-                WcsTasksRequest requestTask = new WcsTasksRequest
+                var requestTask = new WcsTasksRequest
                 {
                     GroupId = Guid.NewGuid().ToString(),
                     MsgTime = DateTime.UtcNow,
@@ -45,7 +41,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services
                             TaskId = task.TaskNo,
                             TaskType = task.TaskType,
                             ContainerCode = task.CarrierCode,
-                            StationCode = stationCode,
+                            StationCode = stationCode
                         }
                     }
                 };
@@ -60,17 +56,26 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.BearerToken);
                 }
 
-                var response = await httpClient.SendAsync(request, cancellationToken);
+                //超时控制
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(config.TimeoutSeconds));
+
+                //发送http
+                var response = await httpClient.SendAsync(request, timeoutCts.Token);
 
                 if (response.IsSuccessStatusCode)
                     return (true, "下发成功");
 
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
+                var error = await response.Content.ReadAsStringAsync(timeoutCts.Token);
                 return (false, $"HTTP {(int)response.StatusCode}: {error}");
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return (false, "请求超时，请检查接口地址或目标系统状态");
             }
             catch (TaskCanceledException)
             {
-                return (false, "请求超时，请检查接口地址或目标系统状态");
+                return (false, "请求已取消");
             }
             catch (HttpRequestException ex)
             {

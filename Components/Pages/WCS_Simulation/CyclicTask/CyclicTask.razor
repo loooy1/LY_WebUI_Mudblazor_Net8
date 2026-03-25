@@ -1,0 +1,338 @@
+﻿@page "/wcs-simulation/cyclic-task"
+
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Models
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject
+@using MudBlazor
+@implements IDisposable
+
+@inject ICyclicConfigReader ConfigReader
+@inject ICyclicConfigWriter ConfigWriter
+@inject IRcsDbService RcsDbService
+@inject ICyclicTasksIssuing CyclicTasksIssuing
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+    <MudGrid Spacing="3">
+        <!-- 左列：RCS 连接 / 周期任务控制 -->
+        <MudItem xs="12" md="4">
+            <MudCard Class="modern-card h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Storage" Class="mr-2" />
+                            RCS 连接设置
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+
+                <MudCardContent>
+                    <MudStack Spacing="2">
+                        <MudTextField Label="RCS 主机/IP" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.Host" />
+                        <MudNumericField T="int" Label="端口" Variant="Variant.Outlined" Dense="true" Min="1" Max="65535" @bind-Value="_cfg.Port" />
+                        <MudTextField Label="用户名" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.User" />
+                        <MudTextField Label="密码" Variant="Variant.Outlined" Dense="true" InputType="InputType.Password" @bind-Value="_cfg.Password" />
+                        <MudTextField Label="数据库名" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.Database" />
+
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="conn-controls">
+                            <div class="btn-group">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="TestConnectionAsync" StartIcon="@Icons.Material.Filled.WifiTethering">
+                                    测试连接（并保存配置）
+                                </MudButton>
+
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="DisconnectAsync" StartIcon="@Icons.Material.Filled.LinkOff">
+                                    断开数据库
+                                </MudButton>
+                            </div>
+
+                            <div class="status-wrapper">
+                                <MudText Typo="Typo.caption" Class="status-text ml-2">@_lastCheckedText</MudText>
+                            </div>
+                        </MudStack>
+
+                        <div>
+                            <MudText Typo="Typo.subtitle2">连接状态</MudText>
+                            <MudChip T="string" Color="@GetStatusColorFromCfg()" Variant="Variant.Filled" StartIcon="@GetStatusIconFromCfg()">
+                                @_cfg.ConnectionState.ToString()
+                            </MudChip>
+                        </div>
+
+                        <MudDivider Class="my-2" />
+
+                        <MudText Typo="Typo.h6">周期任务</MudText>
+
+                        <!-- 修改：周期任务改为下拉选择不同项目的周期任务（暂不实现业务逻辑） -->
+                        <MudStack Spacing="1">
+                            <MudSelect T="string" Label="选择项目/周期任务" Variant="Variant.Outlined" Dense="true" @bind-Value="_selectedProject">
+                                @foreach (var p in _projectOptions)
+                                {
+                                    <MudSelectItem T="string" Value="@p">@p</MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudStack Row="true" Spacing="1">
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="StartCycle" StartIcon="@Icons.Material.Filled.PlayArrow" Disabled="@string.IsNullOrWhiteSpace(_selectedProject)">
+                                    开始
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="StopCycle" StartIcon="@Icons.Material.Filled.Stop" Disabled="@string.IsNullOrWhiteSpace(_selectedProject)">
+                                    停止
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="RunOnce" StartIcon="@Icons.Material.Filled.Refresh" Disabled="@string.IsNullOrWhiteSpace(_selectedProject)">
+                                    立即执行
+                                </MudButton>
+                            </MudStack>
+
+                            <MudText Typo="Typo.caption" Class="mt-2">已选： @_selectedProject ?? "未选择"</MudText>
+                            <MudText Typo="Typo.caption" Class="mt-2">@_logText</MudText>
+                            <MudText Typo="Typo.caption" Class="mt-1">说明：根据选择的项目，后台会执行对应周期任务（逻辑后续实现）</MudText>
+                        </MudStack>
+
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- 右列：任务看板（硬编码示例） -->
+        <MudItem xs="12" md="8">
+            <MudCard Class="modern-card h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
+                            周期任务看板
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+
+                <MudCardContent Class="module-scroll">
+                    <MudTable Dense="true" Hover="true" Items="_boardTasks">
+                        <HeaderContent>
+                            <MudTh>任务号</MudTh>
+                            <MudTh>类型</MudTh>
+                            <MudTh>来源</MudTh>
+                            <MudTh>目标</MudTh>
+                            <MudTh>优先级</MudTh>
+                            <MudTh>状态</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="任务号">@context.TaskNo</MudTd>
+                            <MudTd DataLabel="类型">@context.TaskType</MudTd>
+                            <MudTd DataLabel="来源">@context.SourceLocation</MudTd>
+                            <MudTd DataLabel="目标">@context.TargetLocation</MudTd>
+                            <MudTd DataLabel="优先级">@context.Priority</MudTd>
+                            <MudTd DataLabel="状态">
+                                <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+<style>
+    /* btn-group 固定只包裹按钮，不随状态文本变化伸缩 */
+    .conn-controls .btn-group {
+        display: flex;
+        gap: 8px;
+        flex: 0 0 auto;
+        align-items: center;
+    }
+
+    /* status-wrapper 放在右侧，宽度固定或最大宽度，文本溢出省略 */
+    .conn-controls .status-wrapper {
+        display: flex;
+        align-items: center;
+        margin-left: auto; /* 推到最右侧 */
+        min-width: 180px; /* 根据需要调整 */
+        max-width: 320px;
+        flex: 0 0 auto;
+    }
+
+    /* 状态文本不换行，超出显示省略号 */
+    .status-text {
+        display: block;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+</style>
+
+@code {
+    // 表单模型（绑定到 UI），UI 不直接覆盖服务端的连接状态字段
+    private RcsConnectionConfig _cfg = new();
+
+    private string _lastCheckedText = "未检测";
+    private string _logText = $"{DateTime.Now:HH:mm:ss} [info] 等待下发周期任务";
+
+    private CancellationTokenSource? _monitorCts;
+    private bool _cycleRunning = false;
+
+    // 周期任务相关（下拉选择）
+    private string? _selectedProject;
+    private readonly List<string> _projectOptions = new()
+    {
+        "泰国TWD项目",
+        "项目B",
+        "项目C"
+    };
+
+    // 看板示例（硬编码）
+    private readonly List<BoardTask> _boardTasks = new()
+    {
+        new BoardTask("TK202603250001","NORMAL_INBOUND","A1","B1",3,"待处理"),
+        new BoardTask("TK202603250002","CONTAINER_OUTBOUND","C3","D4",2,"处理中"),
+        new BoardTask("TK202603250003","TWD_SORTING","E2","F6",1,"已完成"),
+    };
+
+    protected override void OnInitialized()
+    {
+        // 加载内存配置（单例），保持连接状态
+        var stored = ConfigReader.Get();
+        if (stored is not null)
+        {
+            _cfg = stored.Clone();
+            _lastCheckedText = stored.LastCheckedUtc.HasValue
+                ? $"已加载：{stored.LastCheckedUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss} {stored.LastStatusMessage}"
+                : "已加载内存配置";
+        }
+    }
+
+    // 测试与断开逻辑保持前面实现（略），这里只展示周期任务的占位控制逻辑
+
+    // 开始周期任务（占位）：根据 _selectedProject 调用对应占位方法
+    private void StartCycle()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedProject))
+        {
+            AddLog("WARN", "请先选择项目周期任务");
+            return;
+        }
+
+        _cycleRunning = true;
+        AddLog("INFO", $"已启动周期任务：{_selectedProject}");
+
+        // TODO: 将来在这里基于 _selectedProject 调用具体的周期任务启动逻辑
+        if (_selectedProject == "泰国TWD项目") 
+            CyclicTasksIssuing.ReadCargoAsync();
+    }
+
+    private void StopCycle()
+    {
+        if (!_cycleRunning)
+        {
+            AddLog("WARN", "周期任务未在运行");
+            return;
+        }
+
+        _cycleRunning = false;
+        AddLog("INFO", $"已停止周期任务：{_selectedProject}");
+
+        // TODO: 将来在这里调用停止逻辑
+    }
+
+    private void RunOnce()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedProject))
+        {
+            AddLog("WARN", "请先选择项目周期任务");
+            return;
+        }
+
+        AddLog("INFO", $"立即执行一次：{_selectedProject}");
+
+        // TODO: 将来在这里执行一次性的项目任务（异步调用服务层方法）
+    }
+
+    // 其余方法保持（连接、保存、监测等）
+    private async Task TestConnectionAsync()
+    {
+        // 先把用户输入的连接参数写入，但保留服务端状态字段
+        var stored = ConfigReader.Get();
+        var toSave = _cfg.Clone();
+        if (stored is not null)
+        {
+            toSave.ConnectionState = stored.ConnectionState;
+            toSave.LastStatusMessage = stored.LastStatusMessage;
+            toSave.LastCheckedUtc = stored.LastCheckedUtc;
+        }
+        ConfigWriter.Save(toSave);
+
+        _lastCheckedText = $"{DateTime.Now:HH:mm:ss} 配置已保存，正在测试...";
+        await InvokeAsync(StateHasChanged);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, _cfg.ConnectTimeoutSeconds)));
+        var ok = await RcsDbService.TestConnectionAsync(cts.Token);
+
+        // 读取更新后的配置（服务会写回连接状态/信息）
+        _cfg = ConfigReader.Get();
+        _lastCheckedText = _cfg.LastCheckedUtc.HasValue
+            ? ($"上次检测: {_cfg.LastCheckedUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss} {_cfg.LastStatusMessage}")
+            : $"{DateTime.Now:HH:mm:ss} 测试完成";
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task DisconnectAsync()
+    {
+        await RcsDbService.DisconnectAsync();
+
+        // 停止监测并清空本地表单（UI）
+        _monitorCts?.Cancel();
+        _monitorCts = null;
+
+        _cfg = ConfigReader.Get();
+        _lastCheckedText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 已断开";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void AddLog(string level, string message)
+    {
+        _logText = $"{DateTime.Now:HH:mm:ss} [{level}] {message}";
+        InvokeAsync(StateHasChanged);
+    }
+
+    private Color GetStatusColorFromCfg()
+    {
+        var s = _cfg.ConnectionState.ToString();
+        return s switch
+        {
+            "Connected" => Color.Success,
+            "Testing" => Color.Info,
+            "Disconnected" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStatusIconFromCfg()
+    {
+        var s = _cfg.ConnectionState.ToString();
+        return s switch
+        {
+            "Connected" => Icons.Material.Filled.CheckCircle,
+            "Testing" => Icons.Material.Filled.Autorenew,
+            "Disconnected" => Icons.Material.Filled.Warning,
+            _ => Icons.Material.Filled.HelpOutline
+        };
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "待处理" => Color.Warning,
+        "处理中" => Color.Info,
+        "已完成" => Color.Success,
+        "PENDING" => Color.Warning,
+        "IN_PROGRESS" => Color.Info,
+        "DONE" => Color.Success,
+        _ => Color.Default
+    };
+
+    public void Dispose()
+    {
+        _monitorCts?.Cancel();
+        _monitorCts?.Dispose();
+    }
+
+    private sealed record BoardTask(string TaskNo, string TaskType, string SourceLocation, string TargetLocation, int Priority, string Status);
+}

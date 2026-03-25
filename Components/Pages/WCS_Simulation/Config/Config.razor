@@ -156,8 +156,11 @@
 </style>
 
 @code {
+    //显示配置数据变量
     private ApiDispatchConfig _config = new();
+    //编辑时使用的临时变量，避免修改后未保存直接影响显示
     private ApiDispatchConfig _editConfig = new();
+    //是否处于编辑状态
     private bool _isEditing;
 
     protected override void OnInitialized()
@@ -168,26 +171,26 @@
     private void Reload()
     {
         _config = ConfigReader.Get();
-        _editConfig = _config.Clone();
+        _editConfig = _config;
         _isEditing = false;
     }
 
     private void BeginEdit()
     {
-        _editConfig = _config.Clone();
+        _editConfig = _config;
         _isEditing = true;
     }
 
     private void CancelEdit()
     {
-        _editConfig = _config.Clone();
+        _editConfig = _config;
         _isEditing = false;
     }
 
     private void Save()
     {
         ConfigWriter.Save(_editConfig);
-        _config = _editConfig.Clone();
+        _config = _editConfig;
         _isEditing = false;
         Snackbar.Add("接口配置已保存", Severity.Success);
     }

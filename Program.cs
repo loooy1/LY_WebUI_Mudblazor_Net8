@@ -1,6 +1,8 @@
 using LY_WebUI_Mudblazor_net8.Components;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Services;
+using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services;
+using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject;
 using MudBlazor.Services;
 
 
@@ -21,10 +23,22 @@ builder.Services.AddHttpClient<IWcsTaskHttpService, WcsTaskHttpService>(client =
     client.Timeout = TimeSpan.FromSeconds(10);
 });
 
-//注册API调度配置服务
+// 注册Config 读写服务，并把两个接口映射到同一个实例
 builder.Services.AddScoped<ApiDispatchConfigStore>();
 builder.Services.AddScoped<IApiDispatchConfigReader>(sp => sp.GetRequiredService<ApiDispatchConfigStore>());
 builder.Services.AddScoped<IApiDispatchConfigWriter>(sp => sp.GetRequiredService<ApiDispatchConfigStore>());
+
+
+// 注册CyclicTask 读写服务，并把两个接口映射到同一个实例
+builder.Services.AddSingleton<CyclicConfigStore>();
+builder.Services.AddSingleton<ICyclicConfigReader>(sp => sp.GetRequiredService<CyclicConfigStore>());
+builder.Services.AddSingleton<ICyclicConfigWriter>(sp => sp.GetRequiredService<CyclicConfigStore>());
+
+// 注册数据库访问服务（使用配置读取器）
+builder.Services.AddScoped<IRcsDbService, RcsDbService>();
+
+// 注册TWD项目循环任务下发服务
+builder.Services.AddScoped<ICyclicTasksIssuing, CyclicTasksIssuingTWD>();
 
 var app = builder.Build();
 

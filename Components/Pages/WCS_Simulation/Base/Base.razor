@@ -124,26 +124,6 @@
                                           @bind-Value="_draft.TargetLocation" />
                         </MudItem>
 
-                        <MudItem xs="12" sm="6">
-                            <MudNumericField T="int"
-                                             Label="优先级"
-                                             Variant="Variant.Outlined"
-                                             Dense="true"
-                                             Min="1"
-                                             Max="5"
-                                             @bind-Value="_draft.Priority" />
-                        </MudItem>
-
-                        <MudItem xs="12" sm="6">
-                            <MudNumericField T="int"
-                                             Label="数量"
-                                             Variant="Variant.Outlined"
-                                             Dense="true"
-                                             Min="1"
-                                             Max="9999"
-                                             @bind-Value="_draft.Quantity" />
-                        </MudItem>
-
                         <MudItem xs="12">
                             <MudSwitch T="bool"
                                        Color="Color.Primary"
@@ -206,7 +186,6 @@
                                 <MudTh>起点</MudTh>
                                 <MudTh>接驳位点位</MudTh>
                                 <MudTh>目标</MudTh>
-                                <MudTh>优先级</MudTh>
                                 <MudTh>状态</MudTh>
                                 <MudTh>操作</MudTh>
                             </HeaderContent>
@@ -216,7 +195,6 @@
                                 <MudTd DataLabel="起点">@context.SourceLocation</MudTd>
                                 <MudTd DataLabel="接驳位点位">@context.TransferLocation</MudTd>
                                 <MudTd DataLabel="目标">@context.TargetLocation</MudTd>
-                                <MudTd DataLabel="优先级">@context.Priority</MudTd>
                                 <MudTd DataLabel="状态">
                                     <MudChip T="string"
                                              Color="@GetStatusColor(context.Status)"
@@ -432,7 +410,6 @@
             TargetLocation = _draft.TargetLocation,
             Warehouse = _config.WarehouseName,
             Priority = _draft.Priority,
-            Quantity = _draft.Quantity,
             IsUrgent = _draft.IsUrgent,
             Status = "待发送",
             CreatedTime = DateTime.Now
@@ -441,14 +418,8 @@
         _queuedTasks.Add(task);
         AddLog("INFO", $"任务已加入队列：{task.TaskNo} -> {_config.TargetSystem}");
 
-        // _draft.CarrierCode = string.Empty;
-        // _draft.SourceLocation = string.Empty;
-        // _draft.TransferLocation = string.Empty;
-        // _draft.TargetLocation = string.Empty;
-        // _draft.Quantity = 1;
-        // _draft.IsUrgent = false;
-        // GenerateDraftTaskNo();
-
+        //更新任务号
+        GenerateDraftTaskNo();
         Snackbar.Add("已加入待发队列", Severity.Success);
     }
 

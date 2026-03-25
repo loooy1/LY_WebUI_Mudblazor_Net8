@@ -4,6 +4,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Service
 {
     public sealed class ApiDispatchConfigStore : IApiDispatchConfigReader, IApiDispatchConfigWriter
     {
+        //内存变量
         private ApiDispatchConfig _current = new();
 
         public ApiDispatchConfig Get() => _current.Clone();
