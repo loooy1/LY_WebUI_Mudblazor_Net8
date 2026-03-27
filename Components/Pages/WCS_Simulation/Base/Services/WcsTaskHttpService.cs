@@ -9,10 +9,8 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services
         HttpClient httpClient,
         IApiDispatchConfigReader configReader) : IWcsTaskHttpService
     {
-        public async Task<(bool Success, string Message)> SendTaskAsync(
-            QueuedTask task,
-            string targetSystem,
-            CancellationToken cancellationToken = default)
+        async Task<(bool Success, string Message)> IWcsTaskHttpService.SendTaskAsync<T>(T task, string targetSystem, CancellationToken cancellationToken)
+
         {
             try
             {

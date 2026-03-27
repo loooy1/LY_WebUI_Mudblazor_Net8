@@ -26,6 +26,9 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Mod
         public string LastStatusMessage { get; set; } = string.Empty;
         public DateTime? LastCheckedUtc { get; set; }
 
+        //周期任务楼层
+        public int Floor { get; set; } = 1;
+
         public RcsConnectionConfig Clone() => new()
         {
             Host = Host,

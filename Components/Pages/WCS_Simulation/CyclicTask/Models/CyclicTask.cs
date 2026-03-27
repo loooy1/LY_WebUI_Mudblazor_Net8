@@ -1,9 +1,9 @@
 ﻿using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services;
 
-namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Models
+namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Models
 {
-    // 待发任务模型
-    public sealed class QueuedTask : ITaskData
+    //周期任务模型
+    public sealed class CyclicTaskModel : ITaskData
     {
         //任务id
         public string TaskNo { get; set; } = string.Empty;
@@ -23,13 +23,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Models
         public int Priority { get; set; }
         //数量
         public int Quantity { get; set; }
-        //是否紧急
-        public bool IsUrgent { get; set; }
-        //任务状态（待发送、发送中、已完成、发送失败等）
-        public string Status { get; set; } = "待发送";
         //创建时间
-        public DateTime CreatedTime { get; set; }
-
+        public DateTime CreatedTime { get ; set ; }
     }
-
 }

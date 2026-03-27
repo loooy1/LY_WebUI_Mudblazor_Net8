@@ -10,6 +10,7 @@
 @inject ICyclicConfigWriter ConfigWriter
 @inject IRcsDbService RcsDbService
 @inject ICyclicTasksIssuing CyclicTasksIssuing
+@inject ISnackbar Snackbar  
 
 <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
     <MudGrid Spacing="3">
@@ -210,12 +211,20 @@
             return;
         }
 
+        // 如果连接状态不是已连接，则报错并返回
+        if (_cfg.ConnectionState != ConnState.Connected)
+        {
+            AddLog("ERROR", "数据库未连接，请先测试并确认连接状态为 Connected");
+            return;
+        }
+
+
         _cycleRunning = true;
         AddLog("INFO", $"已启动周期任务：{_selectedProject}");
 
         // TODO: 将来在这里基于 _selectedProject 调用具体的周期任务启动逻辑
         if (_selectedProject == "泰国TWD项目") 
-            CyclicTasksIssuing.ReadCargoAsync();
+            CyclicTasksIssuing.Test(10);
     }
 
     private void StopCycle()
@@ -291,6 +300,23 @@
     {
         _logText = $"{DateTime.Now:HH:mm:ss} [{level}] {message}";
         InvokeAsync(StateHasChanged);
+
+        // 同时在界面上显示 Snackbar（根据级别映射）
+        var severity = level switch
+        {
+            "ERROR" => Severity.Error,
+            "WARN" => Severity.Warning,
+            _ => Severity.Info
+        };
+
+        try
+        {
+            Snackbar?.Add(message, severity);
+        }
+        catch
+        {
+            // 避免因 Snackbar 抛异常影响主流程
+        }
     }
 
     private Color GetStatusColorFromCfg()
