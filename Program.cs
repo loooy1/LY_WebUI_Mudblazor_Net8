@@ -1,8 +1,9 @@
 using LY_WebUI_Mudblazor_net8.Components;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services;
-using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Services;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject;
+using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Services;
+using MudBlazor;
 using MudBlazor.Services;
 
 
@@ -13,8 +14,22 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-//添加MudBlazor服务
-builder.Services.AddMudServices();
+// 添加MudBlazor服务并统一配置全局 Snackbar 行为/外观
+builder.Services.AddMudServices(config =>
+{
+    // 全局 Snackbar 配置（按需调整）
+    config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopRight; // 位置
+    config.SnackbarConfiguration.PreventDuplicates = true;                           // 防止重复消息
+    config.SnackbarConfiguration.NewestOnTop = false;                               // 新消息是否置顶
+    config.SnackbarConfiguration.ShowCloseIcon = true;                              // 显示关闭图标
+    config.SnackbarConfiguration.VisibleStateDuration = 5000;                       // 可见时长（ms）
+    config.SnackbarConfiguration.HideTransitionDuration = 500;                      // 隐藏过渡（ms）
+    config.SnackbarConfiguration.ShowTransitionDuration = 500;                      // 显示过渡（ms）
+    config.SnackbarConfiguration.MaxDisplayedSnackbars = 10;                        // 最大同时显示条数
+    config.SnackbarConfiguration.RequireInteraction = false;                        // 是否需要用户交互（不自动消失）
+    config.SnackbarConfiguration.SnackbarVariant = Variant.Filled;                  // Variant.Filled(默认) Variant.Text (纯文字) 和 Variant.Outlined (边框样式)。
+    config.SnackbarConfiguration.ClearAfterNavigation = false;                      // 导航后关闭
+});
 
 //注册HTTP客户端服务
 builder.Services.AddHttpClient<IWcsTaskHttpService, WcsTaskHttpService>(client =>
@@ -23,16 +38,8 @@ builder.Services.AddHttpClient<IWcsTaskHttpService, WcsTaskHttpService>(client =
     client.Timeout = TimeSpan.FromSeconds(10);
 });
 
-// 注册Config 读写服务，并把两个接口映射到同一个实例
-builder.Services.AddScoped<ApiDispatchConfigStore>();
-builder.Services.AddScoped<IApiDispatchConfigReader>(sp => sp.GetRequiredService<ApiDispatchConfigStore>());
-builder.Services.AddScoped<IApiDispatchConfigWriter>(sp => sp.GetRequiredService<ApiDispatchConfigStore>());
-
-
-// 注册CyclicTask 读写服务，并把两个接口映射到同一个实例
-builder.Services.AddSingleton<CyclicConfigStore>();
-builder.Services.AddSingleton<ICyclicConfigReader>(sp => sp.GetRequiredService<CyclicConfigStore>());
-builder.Services.AddSingleton<ICyclicConfigWriter>(sp => sp.GetRequiredService<CyclicConfigStore>());
+//注册全局内存读写服务
+builder.Services.AddScoped<IAppMemoryStore, AppMemoryStore>();
 
 // 注册数据库访问服务（使用配置读取器）
 builder.Services.AddScoped<IRcsDbService, RcsDbService>();

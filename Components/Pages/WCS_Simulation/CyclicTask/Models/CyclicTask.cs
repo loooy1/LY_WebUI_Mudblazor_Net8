@@ -25,5 +25,20 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Mod
         public int Quantity { get; set; }
         //创建时间
         public DateTime CreatedTime { get ; set ; }
+
+        //克隆方法
+        public CyclicTaskModel Clone() => new()
+        {
+            TaskNo = TaskNo,
+            TaskType = TaskType,
+            CarrierCode = CarrierCode,
+            SourceLocation = SourceLocation,
+            TransferLocation = TransferLocation,
+            TargetLocation = TargetLocation,
+            Warehouse = Warehouse,
+            Priority = Priority,
+            Quantity = Quantity,
+            CreatedTime = CreatedTime
+        };
     }
 }

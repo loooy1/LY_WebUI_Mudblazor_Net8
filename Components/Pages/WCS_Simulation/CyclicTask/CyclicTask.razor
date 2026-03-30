@@ -3,14 +3,13 @@
 @using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services
 @using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Models
 @using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Services
 @using MudBlazor
-@implements IDisposable
 
-@inject ICyclicConfigReader ConfigReader
-@inject ICyclicConfigWriter ConfigWriter
 @inject IRcsDbService RcsDbService
 @inject ICyclicTasksIssuing CyclicTasksIssuing
-@inject ISnackbar Snackbar  
+@inject ISnackbar Snackbar
+@inject IAppMemoryStore _appMemoryStore
 
 <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
     <MudGrid Spacing="3">
@@ -46,7 +45,7 @@
                             </div>
 
                             <div class="status-wrapper">
-                                <MudText Typo="Typo.caption" Class="status-text ml-2">@_lastCheckedText</MudText>
+                                <MudText Typo="Typo.caption" Class="status-text ml-2">@LastCheckedText</MudText>
                             </div>
                         </MudStack>
 
@@ -61,7 +60,6 @@
 
                         <MudText Typo="Typo.h6">周期任务</MudText>
 
-                        <!-- 修改：周期任务改为下拉选择不同项目的周期任务（暂不实现业务逻辑） -->
                         <MudStack Spacing="1">
                             <MudSelect T="string" Label="选择项目/周期任务" Variant="Variant.Outlined" Dense="true" @bind-Value="_selectedProject">
                                 @foreach (var p in _projectOptions)
@@ -69,22 +67,27 @@
                                     <MudSelectItem T="string" Value="@p">@p</MudSelectItem>
                                 }
                             </MudSelect>
+                            <MudItem xs="12">
+                                <MudTextField Label="执行次数"
+                                              Variant="Variant.Outlined"
+                                              Dense="true"
+                                              @bind-Value="_cycleTimes" />
+                            </MudItem>
 
-                            <MudStack Row="true" Spacing="1">
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
                                 <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="StartCycle" StartIcon="@Icons.Material.Filled.PlayArrow" Disabled="@string.IsNullOrWhiteSpace(_selectedProject)">
                                     开始
                                 </MudButton>
                                 <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="StopCycle" StartIcon="@Icons.Material.Filled.Stop" Disabled="@string.IsNullOrWhiteSpace(_selectedProject)">
                                     停止
                                 </MudButton>
-                                <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="RunOnce" StartIcon="@Icons.Material.Filled.Refresh" Disabled="@string.IsNullOrWhiteSpace(_selectedProject)">
-                                    立即执行
-                                </MudButton>
                             </MudStack>
 
-                            <MudText Typo="Typo.caption" Class="mt-2">已选： @_selectedProject ?? "未选择"</MudText>
+                            <MudText Typo="Typo.caption" Class="mt-2" Style="@(_selectedProject != null ? "color: green;" : "")">
+                                已选： @(_selectedProject ?? "未选择")
+                            </MudText>
                             <MudText Typo="Typo.caption" Class="mt-2">@_logText</MudText>
-                            <MudText Typo="Typo.caption" Class="mt-1">说明：根据选择的项目，后台会执行对应周期任务（逻辑后续实现）</MudText>
+                            <MudText Typo="Typo.caption" Class="mt-1">说明：根据选择的项目，后台会执行对应周期任务</MudText>
                         </MudStack>
 
                     </MudStack>
@@ -92,7 +95,7 @@
             </MudCard>
         </MudItem>
 
-        <!-- 右列：任务看板（硬编码示例） -->
+        <!-- 右列：任务看板（从内存读取并展示） -->
         <MudItem xs="12" md="8">
             <MudCard Class="modern-card h-100">
                 <MudCardHeader>
@@ -102,29 +105,61 @@
                             周期任务看板
                         </MudText>
                     </CardHeaderContent>
+
+                    <CardHeaderActions>
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ClearBoard" StartIcon="@Icons.Material.Filled.Delete">
+                                清空
+                            </MudButton>
+                            <MudText Typo="Typo.caption" Class="ml-2">每页</MudText>
+                            <MudSelect T="int" @bind-Value="_pageSize" Dense="true" Style="width:80px">
+                                <MudSelectItem T="int" Value="10">10</MudSelectItem>
+                                <MudSelectItem T="int" Value="20">20</MudSelectItem>
+                                <MudSelectItem T="int" Value="50">50</MudSelectItem>
+                            </MudSelect>
+                        </MudStack>
+                    </CardHeaderActions>
                 </MudCardHeader>
 
-                <MudCardContent Class="module-scroll">
-                    <MudTable Dense="true" Hover="true" Items="_boardTasks">
-                        <HeaderContent>
-                            <MudTh>任务号</MudTh>
-                            <MudTh>类型</MudTh>
-                            <MudTh>来源</MudTh>
-                            <MudTh>目标</MudTh>
-                            <MudTh>优先级</MudTh>
-                            <MudTh>状态</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="任务号">@context.TaskNo</MudTd>
-                            <MudTd DataLabel="类型">@context.TaskType</MudTd>
-                            <MudTd DataLabel="来源">@context.SourceLocation</MudTd>
-                            <MudTd DataLabel="目标">@context.TargetLocation</MudTd>
-                            <MudTd DataLabel="优先级">@context.Priority</MudTd>
-                            <MudTd DataLabel="状态">
-                                <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
-                            </MudTd>
-                        </RowTemplate>
-                    </MudTable>
+                <!-- MudCardContent 依然是 flex 列布局，用于固定页脚 -->
+                <MudCardContent Class="module-scroll d-flex flex-column">
+                    <!-- 可滚动列表区域：设置固定高度 -->
+                    <div class="board-scroll">
+                        <MudTable Dense="true" Hover="true" Items="_pagedBoardTasks">
+                            <HeaderContent>
+                                <MudTh>任务号</MudTh>
+                                <MudTh>类型</MudTh>
+                                <MudTh>来源</MudTh>
+                                <MudTh>目标</MudTh>
+                                <MudTh>优先级</MudTh>
+                                <MudTh>状态</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="任务号">@context.TaskNo</MudTd>
+                                <MudTd DataLabel="类型">@context.TaskType</MudTd>
+                                <MudTd DataLabel="来源">@context.SourceLocation</MudTd>
+                                <MudTd DataLabel="目标">@context.TargetLocation</MudTd>
+                                <MudTd DataLabel="优先级">@context.Priority</MudTd>
+                                <MudTd DataLabel="状态">
+                                    <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </div>
+
+                    <!-- 固定在卡片底部的分页/操作区 -->
+                    <div class="board-footer">
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            <MudButton Variant="Variant.Outlined" OnClick="PrevPage" Disabled="@(_currentPage <= 1)">
+                                <MudIcon Icon="@Icons.Material.Filled.ChevronLeft" />
+                            </MudButton>
+                            <MudText Typo="Typo.subtitle2">第 @_currentPage / @_totalPages 页</MudText>
+                            <MudButton Variant="Variant.Outlined" OnClick="NextPage" Disabled="@(_currentPage >= _totalPages)">
+                                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" />
+                            </MudButton>
+                            <MudText Typo="Typo.caption">共 @_totalItems 条</MudText>
+                        </MudStack>
+                    </div>
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -158,51 +193,178 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-</style>
+
+    .module-scroll.d-flex.flex-column {
+        height: 100%;
+        /* 确保 MudCardContent 作为一个垂直弹性盒子 */
+    }
+
+    .board-scroll {
+        /* 设置一个固定的高度，例如显示大约 10 行数据 */
+        height: 800px; /* 您可以根据需要调整这个值 */
+    
+        /* 或者设置最大高度，这样在数据很少时不会浪费空间，数据多时也不会超过限制 */
+        /* max-height: 400px; */
+
+        overflow-y: auto; /* 当内容超出设定的高度时，显示垂直滚动条 */
+    }
+
+    .board-footer {
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px;
+        border-top: 1px solid rgba(0,0,0,.12);
+        /* 由于父容器是 flex-column，这个 margin-top: auto 会将页脚推到底部 */
+        margin-top: auto;
+    }
+
+    
+    </style>
 
 @code {
-    // 表单模型（绑定到 UI），UI 不直接覆盖服务端的连接状态字段
-    private RcsConnectionConfig _cfg = new();
+	[Inject] private ISnackbar SnackbarInject { get; set; } = default!;
 
-    private string _lastCheckedText = "未检测";
-    private string _logText = $"{DateTime.Now:HH:mm:ss} [info] 等待下发周期任务";
+	private RcsConnectionConfig _cfg = new();
 
-    private CancellationTokenSource? _monitorCts;
-    private bool _cycleRunning = false;
+	// 看板数据模型
+	private sealed record BoardTask(string TaskNo, string TaskType, string SourceLocation, string TargetLocation, int Priority, string Status);
 
-    // 周期任务相关（下拉选择）
-    private string? _selectedProject;
-    private readonly List<string> _projectOptions = new()
+	private string _lastCheckedText = "未检测";
+	public string LastCheckedText
+	{
+		get => _lastCheckedText;
+		private set
+		{
+			_lastCheckedText = value;
+			LogStatusChange(_lastCheckedText);
+		}
+	}
+
+	private string _logText = $"{DateTime.Now:HH:mm:ss} [info] 等待下发周期任务";
+
+	private CancellationTokenSource? _monitorCts;
+	private bool _cycleRunning = false;
+
+	private string? _selectedProject;
+	private readonly List<string> _projectOptions = new()
     {
         "泰国TWD项目",
         "项目B",
         "项目C"
     };
 
-    // 看板示例（硬编码）
-    private readonly List<BoardTask> _boardTasks = new()
-    {
-        new BoardTask("TK202603250001","NORMAL_INBOUND","A1","B1",3,"待处理"),
-        new BoardTask("TK202603250002","CONTAINER_OUTBOUND","C3","D4",2,"处理中"),
-        new BoardTask("TK202603250003","TWD_SORTING","E2","F6",1,"已完成"),
-    };
+	// 执行次数
+	private int _cycleTimes = 10;
 
-    protected override void OnInitialized()
+	// 内存中读取的原始 Board 列表（全量）
+	private List<BoardTask> _boardTasks = new();
+
+	// 当前页显示的数据
+	private List<BoardTask> _pagedBoardTasks = new();
+
+	// 轮询内存的任务（读取 DeliveryResult 列表）并刷新 UI
+	private CancellationTokenSource? _boardMonitorCts;
+
+	// 分页 / 显示控制
+	private int _pageSize = 20;
+	private int _currentPage = 1;
+	private int _totalPages = 1;
+	private int _totalItems = 0;
+	private bool _ascending = true; // 顺序显示 (true = 旧到新)
+
+	protected override void OnInitialized()
+	{
+		var stored = _appMemoryStore.GetOrDefault<RcsConnectionConfig>();
+		if (stored is not null)
+		{
+			_cfg = stored.Clone();
+			LastCheckedText = stored.LastCheckedUtc.HasValue
+				? $"已加载：{stored.LastCheckedUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss} {stored.LastStatusMessage}"
+				: "已加载内存配置";
+		}
+
+		StartBoardMonitor();
+	}
+
+	private void StartBoardMonitor()
+	{
+		_boardMonitorCts?.Cancel();
+		_boardMonitorCts = new CancellationTokenSource();
+		var ct = _boardMonitorCts.Token;
+
+		_ = Task.Run(async () =>
+		{
+			while (!ct.IsCancellationRequested)
+			{
+				try
+				{
+					await LoadBoardTasksFromMemoryAsync();
+					await Task.Delay(1000, ct); // 每秒刷新一次
+				}
+				catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
+				catch { /* 忽略单次错误，继续轮询 */ }
+			}
+		}, ct);
+	}
+
+	private async Task LoadBoardTasksFromMemoryAsync()
+	{
+		var results = _appMemoryStore.GetOrDefault<List<DeliveryResult>>() ?? new List<DeliveryResult>();
+
+		IEnumerable<DeliveryResult> ordered = _ascending ? results.AsEnumerable() : results.AsEnumerable().Reverse();
+
+		var mapped = ordered
+			.Select(dr => new BoardTask(
+				dr.Task.TaskNo,
+				dr.Task.TaskType,
+				dr.Task.SourceLocation,
+				dr.Task.TargetLocation,
+				dr.Task.Priority,
+				dr.Success ? "已完成" : "失败"))
+			.ToList();
+
+		// 更新全量与分页信息
+		_boardTasks = mapped;
+		_totalItems = _boardTasks.Count;
+		_pageSize = Math.Max(1, _pageSize);
+		_totalPages = Math.Max(1, (_totalItems + _pageSize - 1) / _pageSize);
+
+		// clamp page
+		if (_currentPage > _totalPages) _currentPage = _totalPages;
+		if (_currentPage < 1) _currentPage = 1;
+
+		_pagedBoardTasks = _boardTasks.Skip((_currentPage - 1) * _pageSize).Take(_pageSize).ToList();
+
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private void ClearBoard()
+	{
+		lock (_boardMonitorCts ?? new CancellationTokenSource()) // simple lock object substitute
+		{
+			_appMemoryStore.Set(new List<DeliveryResult>());
+			_currentPage = 1;
+		}
+
+		_ = LoadBoardTasksFromMemoryAsync();
+	}
+
+    private void PrevPage()
     {
-        // 加载内存配置（单例），保持连接状态
-        var stored = ConfigReader.Get();
-        if (stored is not null)
-        {
-            _cfg = stored.Clone();
-            _lastCheckedText = stored.LastCheckedUtc.HasValue
-                ? $"已加载：{stored.LastCheckedUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss} {stored.LastStatusMessage}"
-                : "已加载内存配置";
-        }
+        if (_currentPage <= 1) return;
+        _currentPage--;
+        _ = LoadBoardTasksFromMemoryAsync();
     }
 
-    // 测试与断开逻辑保持前面实现（略），这里只展示周期任务的占位控制逻辑
+    private void NextPage()
+    {
+        if (_currentPage >= _totalPages) return;
+        _currentPage++;
+        _ = LoadBoardTasksFromMemoryAsync();
+    }
 
-    // 开始周期任务（占位）：根据 _selectedProject 调用对应占位方法
     private void StartCycle()
     {
         if (string.IsNullOrWhiteSpace(_selectedProject))
@@ -211,21 +373,22 @@
             return;
         }
 
-        // 如果连接状态不是已连接，则报错并返回
         if (_cfg.ConnectionState != ConnState.Connected)
         {
             AddLog("ERROR", "数据库未连接，请先测试并确认连接状态为 Connected");
             return;
         }
 
-
         _cycleRunning = true;
         AddLog("INFO", $"已启动周期任务：{_selectedProject}");
 
-        // TODO: 将来在这里基于 _selectedProject 调用具体的周期任务启动逻辑
-        if (_selectedProject == "泰国TWD项目") 
-            CyclicTasksIssuing.Test(10);
+        var times = ParseCycleTimes();
+
+        if (_selectedProject == "泰国TWD项目")
+            _ = CyclicTasksIssuing.Thailand_TWD(times);
     }
+
+    private int ParseCycleTimes() => Math.Max(1, _cycleTimes);
 
     private void StopCycle()
     {
@@ -237,28 +400,11 @@
 
         _cycleRunning = false;
         AddLog("INFO", $"已停止周期任务：{_selectedProject}");
-
-        // TODO: 将来在这里调用停止逻辑
     }
 
-    private void RunOnce()
-    {
-        if (string.IsNullOrWhiteSpace(_selectedProject))
-        {
-            AddLog("WARN", "请先选择项目周期任务");
-            return;
-        }
-
-        AddLog("INFO", $"立即执行一次：{_selectedProject}");
-
-        // TODO: 将来在这里执行一次性的项目任务（异步调用服务层方法）
-    }
-
-    // 其余方法保持（连接、保存、监测等）
     private async Task TestConnectionAsync()
     {
-        // 先把用户输入的连接参数写入，但保留服务端状态字段
-        var stored = ConfigReader.Get();
+        var stored = _appMemoryStore.GetOrDefault<RcsConnectionConfig>();
         var toSave = _cfg.Clone();
         if (stored is not null)
         {
@@ -266,17 +412,15 @@
             toSave.LastStatusMessage = stored.LastStatusMessage;
             toSave.LastCheckedUtc = stored.LastCheckedUtc;
         }
-        ConfigWriter.Save(toSave);
+        _appMemoryStore.Set(toSave);
 
-        _lastCheckedText = $"{DateTime.Now:HH:mm:ss} 配置已保存，正在测试...";
         await InvokeAsync(StateHasChanged);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, _cfg.ConnectTimeoutSeconds)));
-        var ok = await RcsDbService.TestConnectionAsync(cts.Token);
+        await RcsDbService.TestConnectionAsync(cts.Token);
 
-        // 读取更新后的配置（服务会写回连接状态/信息）
-        _cfg = ConfigReader.Get();
-        _lastCheckedText = _cfg.LastCheckedUtc.HasValue
+        _cfg = _appMemoryStore.GetOrDefault<RcsConnectionConfig>() ?? new RcsConnectionConfig();
+        LastCheckedText = _cfg.LastCheckedUtc.HasValue
             ? ($"上次检测: {_cfg.LastCheckedUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss} {_cfg.LastStatusMessage}")
             : $"{DateTime.Now:HH:mm:ss} 测试完成";
 
@@ -286,13 +430,11 @@
     private async Task DisconnectAsync()
     {
         await RcsDbService.DisconnectAsync();
-
-        // 停止监测并清空本地表单（UI）
         _monitorCts?.Cancel();
         _monitorCts = null;
 
-        _cfg = ConfigReader.Get();
-        _lastCheckedText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 已断开";
+        _cfg = _appMemoryStore.GetOrDefault<RcsConnectionConfig>() ?? new RcsConnectionConfig();
+        LastCheckedText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 数据库已断开";
         await InvokeAsync(StateHasChanged);
     }
 
@@ -301,22 +443,19 @@
         _logText = $"{DateTime.Now:HH:mm:ss} [{level}] {message}";
         InvokeAsync(StateHasChanged);
 
-        // 同时在界面上显示 Snackbar（根据级别映射）
         var severity = level switch
         {
             "ERROR" => Severity.Error,
             "WARN" => Severity.Warning,
-            _ => Severity.Info
+            "INFO" => Severity.Success,
+            _ => Severity.Normal
         };
 
         try
         {
             Snackbar?.Add(message, severity);
         }
-        catch
-        {
-            // 避免因 Snackbar 抛异常影响主流程
-        }
+        catch { }
     }
 
     private Color GetStatusColorFromCfg()
@@ -358,7 +497,23 @@
     {
         _monitorCts?.Cancel();
         _monitorCts?.Dispose();
+
+        _boardMonitorCts?.Cancel();
+        _boardMonitorCts?.Dispose();
     }
 
-    private sealed record BoardTask(string TaskNo, string TaskType, string SourceLocation, string TargetLocation, int Priority, string Status);
+    private void LogStatusChange(string statusText)
+    {
+        string logLevel;
+        if (statusText.Contains("成功") || statusText.Contains("Connected"))
+            logLevel = "INFO";
+        else if (statusText.Contains("失败") || statusText.Contains("Disconnected") || statusText.Contains("错误"))
+            logLevel = "ERROR";
+        else if (statusText.Contains("断开") || statusText.Contains("Warning"))
+            logLevel = "WARN";
+        else
+            logLevel = "INFO";
+
+        AddLog(logLevel, statusText);
+    }
 }

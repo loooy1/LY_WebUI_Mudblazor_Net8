@@ -1,10 +1,10 @@
 ﻿@page "/wcs-simulation/config"
+@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Services
 @using MudBlazor
 @using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Models
-@using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Services
-@inject IApiDispatchConfigReader ConfigReader
-@inject IApiDispatchConfigWriter ConfigWriter
+
 @inject ISnackbar Snackbar
+@inject IAppMemoryStore _appMemoryStore
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
     <MudCard Class="config-card">
@@ -170,7 +170,7 @@
 
     private void Reload()
     {
-        _config = ConfigReader.Get();
+        _config = _appMemoryStore.GetOrDefault<ApiDispatchConfig>() ?? new ApiDispatchConfig();
         _editConfig = _config;
         _isEditing = false;
     }
@@ -189,7 +189,7 @@
 
     private void Save()
     {
-        ConfigWriter.Save(_editConfig);
+        _appMemoryStore.Set(_editConfig);
         _config = _editConfig;
         _isEditing = false;
         Snackbar.Add("接口配置已保存", Severity.Success);

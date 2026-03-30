@@ -1,20 +1,22 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Models;
-using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Services;
+using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Config.Models;
+using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Services;
+
 
 namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services
 {
     public sealed class WcsTaskHttpService(
         HttpClient httpClient,
-        IApiDispatchConfigReader configReader) : IWcsTaskHttpService
+        IAppMemoryStore appMemoryStore) : IWcsTaskHttpService
     {
         async Task<(bool Success, string Message)> IWcsTaskHttpService.SendTaskAsync<T>(T task, string targetSystem, CancellationToken cancellationToken)
 
         {
             try
             {
-                var config = configReader.Get();
+                var config = appMemoryStore.GetOrDefault<ApiDispatchConfig>()?? new ApiDispatchConfig();
                 var requestUri = new Uri(new Uri(config.BaseUrl), config.DispatchPath);
 
                 var stationCode = new[]

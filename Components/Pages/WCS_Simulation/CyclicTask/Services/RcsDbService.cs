@@ -1,6 +1,7 @@
 using System.Data;
 using MySqlConnector;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Models;
+using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Services;
 
 namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services
 {
@@ -16,18 +17,16 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
 
     public sealed class RcsDbService : IRcsDbService
     {
-        private readonly ICyclicConfigReader _cfgReader;
-        private readonly ICyclicConfigWriter _cfgWriter;
+        private readonly IAppMemoryStore _appMemoryStore;
 
         // 持有打开的连接，直到 DisconnectAsync 被调用
         private MySqlConnection? _connection;
         private string? _currentConnectionString;
         private readonly object _sync = new();
 
-        public RcsDbService(ICyclicConfigReader cfgReader, ICyclicConfigWriter cfgWriter)
+        public RcsDbService(IAppMemoryStore appMemoryStore)
         {
-            _cfgReader = cfgReader;
-            _cfgWriter = cfgWriter;
+            _appMemoryStore = appMemoryStore;
         }
 
         private static string BuildConnectionString(RcsConnectionConfig cfg)
@@ -48,7 +47,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
         // 打开并保持连接（不在此处关闭），并把连接状态写回配置
         public async Task<bool> TestConnectionAsync(CancellationToken ct = default)
         {
-            var cfg = _cfgReader.Get();
+            var cfg = _appMemoryStore.GetOrDefault<RcsConnectionConfig>();
             if (cfg is null) return false;
 
             var cs = BuildConnectionString(cfg);
@@ -62,9 +61,9 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
                 {
                     var sameCfg = cfg.Clone();
                     sameCfg.ConnectionState = ConnState.Connected;
-                    sameCfg.LastStatusMessage = "Already connected";
+                    sameCfg.LastStatusMessage = "数据库已连接";
                     sameCfg.LastCheckedUtc = DateTime.UtcNow;
-                    _cfgWriter.Save(sameCfg);
+                    _appMemoryStore.Set(sameCfg);
                     return true;
                 }
             }
@@ -74,7 +73,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
             testing.ConnectionState = ConnState.Testing;
             testing.LastStatusMessage = "Testing...";
             testing.LastCheckedUtc = DateTime.UtcNow;
-            _cfgWriter.Save(testing);
+            _appMemoryStore.Set(testing);
 
             MySqlConnection? newConn = null;
             try
@@ -91,9 +90,9 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
 
                     var okCfg = cfg.Clone();
                     okCfg.ConnectionState = ok ? ConnState.Connected : ConnState.Disconnected;
-                    okCfg.LastStatusMessage = ok ? "OK" : "Query returned null";
+                    okCfg.LastStatusMessage = ok ? "数据库连接成功" : "数据库连接失败";
                     okCfg.LastCheckedUtc = DateTime.UtcNow;
-                    _cfgWriter.Save(okCfg);
+                    _appMemoryStore.Set(okCfg);
 
                     if (!ok)
                     {
@@ -131,9 +130,9 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
                 // 写回失败信息
                 var failCfg = cfg.Clone();
                 failCfg.ConnectionState = ConnState.Disconnected;
-                failCfg.LastStatusMessage = ex.Message;
+                failCfg.LastStatusMessage = $"数据库连接失败: {ex.Message}";
                 failCfg.LastCheckedUtc = DateTime.UtcNow;
-                _cfgWriter.Save(failCfg);
+                _appMemoryStore.Set(failCfg);
 
                 // 清理临时连接
                 if (newConn != null)
@@ -153,7 +152,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
         // 查询示例：优先使用已打开的连接，否则临时打开
         public async Task<int> QuerySomeCountAsync(CancellationToken ct = default)
         {
-            var cfg = _cfgReader.Get();
+            var cfg = _appMemoryStore.GetOrDefault<RcsConnectionConfig>();
             if (cfg is null) return -1;
             var cs = BuildConnectionString(cfg);
 
@@ -230,7 +229,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
                 LastStatusMessage = "Disconnected",
                 LastCheckedUtc = DateTime.UtcNow
             };
-            _cfgWriter.Save(disconnected);
+            _appMemoryStore.Set(disconnected);
 
             // 清理连接池
             try
@@ -245,7 +244,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
         // 新增：通用查询实现
         public async Task<List<T>> QueryAsync<T>(string sql, Func<MySqlDataReader, T> map, CancellationToken ct = default)
         {
-            var cfg = _cfgReader.Get();
+            var cfg = _appMemoryStore.GetOrDefault<RcsConnectionConfig>();
             if (cfg is null) return new List<T>();
             var cs = BuildConnectionString(cfg);
 

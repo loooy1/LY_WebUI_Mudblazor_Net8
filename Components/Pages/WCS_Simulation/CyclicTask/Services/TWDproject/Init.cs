@@ -1,43 +1,38 @@
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Collections.Generic;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Base.Services;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Models;
+using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Services; // 新增
 using Microsoft.Extensions.Logging;
 using MySqlConnector;
 using static LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject.CyclicTasksIssuingTWD;
 
 namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject
 {
-    //// Cargo 数据/快照模型
-    //public record BaseCargoRecord(string ContainerCode, string Mark, DateTime RetrievedAt);
-    //// Cargo 快照包含多条记录和快照时间
-    //public record CargoSnapshot(IReadOnlyList<BaseCargoRecord> Items, DateTime SnapshotTime);
+    // 定义结果记录，前端可以直接读取这个列表展示成功/失败及原因
+    public record DeliveryResult(CyclicTaskModel Task, bool Success, string Message, DateTime Time);
 
-    //// Conveyor 仅保存 transfer_points 的数据/快照模型
-    //public record ConveyorRecord(string TransferPoints, DateTime RetrievedAt);
-    //public record ConveyorSnapshot(IReadOnlyList<ConveyorRecord> Items, DateTime SnapshotTime);
-
-    // 新增：storage 专用记录与快照类型（保留 AreaRecord/AreaSnapshot 用于 conveyor/sorting）
+    // 定义三个记录类型：StorageAreaRecord（包含 cargo 字段），AreaRecord（不包含 cargo 字段），以及它们的快照类型
     public record StorageAreaRecord(string WmsCode, string Cargo, DateTime RetrievedAt);
+
+    // StorageAreaSnapshot 包含 StorageAreaRecord 列表和快照时间
     public record StorageAreaSnapshot(IReadOnlyList<StorageAreaRecord> Items, DateTime SnapshotTime);
+
+    // ConveyorArea 和 SortingArea 只需要 WmsCode 和 RetrievedAt，因此使用 AreaRecord
     public record AreaRecord(string WmsCode, DateTime RetrievedAt);
+
+    // ConveyorAreaSnapshot 和 SortingAreaSnapshot 都使用 AreaRecord 列表和快照时间
     public record AreaSnapshot(IReadOnlyList<AreaRecord> Items, DateTime SnapshotTime);
 
     public interface ICyclicTasksIssuing
     {
-        //// cargo 相关方法（保留原方法签名）
-        //Task<CargoSnapshot> ReadCargoAsync(CancellationToken ct = default);
-        //CargoSnapshot? GetLatestCargoSnapshot();
-
-        //// conveyors 相关
-        //Task<ConveyorSnapshot> ReadConveyorsAsync(CancellationToken ct = default);
-        //ConveyorSnapshot? GetLatestConveyorSnapshot();
-
-        // 新增：读取 cargo_area_instances 并分成三个区域快照
+        // 读取 cargo_area_instances 并分成三个区域快照
         Task<(StorageAreaSnapshot StorageArea, AreaSnapshot ConveyorArea, AreaSnapshot SortingArea)> ReadCargoAreaInstancesAsync(CancellationToken ct = default);
 
-        Task Test(int times);
+        // 生成周期任务的主方法：根据读取的三个区域快照生成任务
+        Task Thailand_TWD(int times);
     }
 
     public sealed class CyclicTasksIssuingTWD : ICyclicTasksIssuing
@@ -45,95 +40,22 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
         private readonly IRcsDbService _db;
         private readonly ILogger<CyclicTasksIssuingTWD>? _logger;
         private readonly IWcsTaskHttpService _wcsTaskHttpService;
+        private readonly IAppMemoryStore _appMemoryStore; // 通用内存存储
+        private const string SqlReadCargoAreaInstances = "SELECT cargo_area, wms_code, cargo FROM cargo_area_instances";
 
-        //private readonly object _lock = new();
-        //private CargoSnapshot? _cargoLatest;
+        // 用于内存写操作的同步
+        private readonly object _memoryLock = new();
 
-        // conveyors 缓存与锁（仅保存 transfer_points）
-        //private readonly object _conveyorLock = new();
-        //private ConveyorSnapshot? _conveyorLatest;
-
-
-        public CyclicTasksIssuingTWD(IRcsDbService db, IWcsTaskHttpService wcsTaskHttpService, ILogger<CyclicTasksIssuingTWD>? logger = null)
+        // 构造函数注入数据库服务、HTTP 服务、内存存储和可选的日志服务
+        public CyclicTasksIssuingTWD(IRcsDbService db, IWcsTaskHttpService wcsTaskHttpService, IAppMemoryStore appMemoryStore, ILogger<CyclicTasksIssuingTWD>? logger = null)
         {
             _db = db;
             _logger = logger;
             _wcsTaskHttpService = wcsTaskHttpService;
+            _appMemoryStore = appMemoryStore;
         }
 
-        // ----------------- cargo 读取与缓存 -----------------
-        // 假定 cargo 表有列 code, home_station —— 若不同请修改 SQL
-        //private const string SqlReadCargo = "SELECT code, home_station FROM cargo";
-
-        //public async Task<CargoSnapshot> ReadCargoAsync(CancellationToken ct = default)
-        //{
-        //    var now = DateTime.UtcNow;
-
-        //    var list = await _db.QueryAsync(SqlReadCargo, rdr =>
-        //    {
-        //        var container = rdr.IsDBNull(0) ? string.Empty : rdr.GetString(0);
-        //        var mark = rdr.IsDBNull(1) ? string.Empty : rdr.GetString(1);
-        //        return new BaseCargoRecord(container, mark, now);
-        //    }, ct);
-
-        //    var snapshot = new CargoSnapshot(list, now);
-        //    lock (_lock) { _cargoLatest = snapshot; }
-
-        //    return _cargoLatest;
-        ////}
-
-        //public CargoSnapshot? GetLatestCargoSnapshot()
-        //{
-        //    lock (_lock) { return _cargoLatest; }
-        //}
-
-        //// ----------------- conveyors 读取与缓存（仅 transfer_points） -----------------
-        //// 假定 conveyors 表有列 transfer_points —— 若不同请修改 SQL
-        //private const string SqlReadConveyors = "SELECT transfer_points FROM conveyors";
-
-        //public async Task<ConveyorSnapshot> ReadConveyorsAsync(CancellationToken ct = default)
-        //{
-        //    var now = DateTime.UtcNow;
-
-        //    var list = await _db.QueryAsync(SqlReadConveyors, rdr =>
-        //    {
-        //        var transferPointsRaw = rdr.IsDBNull(0) ? string.Empty : rdr.GetString(0);
-
-        //        // 提取并归一化为 ASCII 数字
-        //        var sb = new StringBuilder(Math.Min(16, transferPointsRaw.Length));
-        //        foreach (var ch in transferPointsRaw)
-        //        {
-        //            if (ch >= '0' && ch <= '9')
-        //            {
-        //                sb.Append(ch);
-        //                continue;
-        //            }
-
-        //            if (char.IsDigit(ch))
-        //            {
-        //                var val = (int)char.GetNumericValue(ch);
-        //                if (val >= 0 && val <= 9)
-        //                    sb.Append((char)('0' + val));
-        //            }
-        //        }
-
-        //        return new ConveyorRecord(sb.ToString(), now);
-        //    }, ct);
-
-        //    var snapshot = new ConveyorSnapshot(list, now);
-        //    lock (_conveyorLock) { _conveyorLatest = snapshot; }
-        //    return snapshot;
-        //}
-
-        //public ConveyorSnapshot? GetLatestConveyorSnapshot()
-        //{
-        //    lock (_conveyorLock) { return _conveyorLatest; }
-        //}
-
-        // ----------------- 新方法：读取 cargo_area_instances 并按 cargo_area 分类 -----------------
-        // 假定表结构：cargo_area_instances(cargo_area, cargo, wms_code)
-        private const string SqlReadCargoAreaInstances = "SELECT cargo_area, wms_code, cargo FROM cargo_area_instances";
-
+        // 读取 cargo_area_instances 表，按 cargo_area 字段分类到三个快照中
         public async Task<(StorageAreaSnapshot StorageArea, AreaSnapshot ConveyorArea, AreaSnapshot SortingArea)> ReadCargoAreaInstancesAsync(CancellationToken ct = default)
         {
             var now = DateTime.UtcNow;
@@ -150,7 +72,6 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
             var storage = new List<StorageAreaRecord>();
             var conveyor = new List<AreaRecord>();
             var sorting = new List<AreaRecord>();
-
 
             foreach (var r in rows)
             {
@@ -187,65 +108,8 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
             );
         }
 
-        //// 新增类型：用于区分存放
-        //public record ContainerRecord(string ContainerCode, string Mark, DateTime RetrievedAt);
-        //public record CargoRecord(string ContainerCode, string Mark, DateTime RetrievedAt);
-
-        //// 将 _cargoLatest 中的 BaseCargoRecord 拆分到两个集合（mark 只保留 ASCII 数字）
-        //private (IReadOnlyList<ContainerRecord> Containers, IReadOnlyList<CargoRecord> Cargos) SplitLatestBaseCargo()
-        //{
-        //    List<ContainerRecord> containers = new();
-        //    List<CargoRecord> cargos = new();
-
-        //    CargoSnapshot? snapshot;
-        //    lock (_lock)
-        //    {
-        //        snapshot = _cargoLatest;
-        //    }
-
-        //    if (snapshot?.Items == null || snapshot.Items.Count == 0)
-        //        return (containers.AsReadOnly(), cargos.AsReadOnly());
-
-        //    static string ExtractDigitsAscii(string? mark)
-        //    {
-        //        if (string.IsNullOrEmpty(mark)) return string.Empty;
-        //        var sb = new StringBuilder(Math.Min(16, mark.Length));
-        //        foreach (var ch in mark)
-        //        {
-        //            if (ch >= '0' && ch <= '9') { sb.Append(ch); continue; }
-        //            if (char.IsDigit(ch))
-        //            {
-        //                var val = (int)char.GetNumericValue(ch);
-        //                if (val >= 0 && val <= 9) sb.Append((char)('0' + val));
-        //            }
-        //        }
-        //        return sb.ToString();
-        //    }
-
-        //    foreach (var rec in snapshot.Items)
-        //    {
-        //        var code = rec.ContainerCode ?? string.Empty;
-        //        var digits = ExtractDigitsAscii(rec.Mark);
-
-        //        if (!string.IsNullOrEmpty(code) && code.IndexOf("container", StringComparison.OrdinalIgnoreCase) >= 0)
-        //        {
-        //            containers.Add(new ContainerRecord(code, digits, rec.RetrievedAt));
-        //        }
-        //        else if (!string.IsNullOrEmpty(code) && code.IndexOf("cargo", StringComparison.OrdinalIgnoreCase) >= 0)
-        //        {
-        //            cargos.Add(new CargoRecord(code, digits, rec.RetrievedAt));
-        //        }
-        //        else
-        //        {
-        //            cargos.Add(new CargoRecord(code, digits, rec.RetrievedAt));
-        //        }
-        //    }
-
-        //    return (containers.AsReadOnly(), cargos.AsReadOnly());
-        //}
-
-
-        public async Task Test(int times)
+        // 生成周期任务的主方法：根据读取的三个区域快照生成任务
+        public async Task Thailand_TWD(int times)
         {
             var (storageArea, conveyorArea, sortingArea) = await ReadCargoAreaInstancesAsync();
 
@@ -326,6 +190,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
         }
 
         // 顺序发送辅助方法：逐条发送，支持取消与日志
+        // 任务下发后把任务结果（成功/失败）保存到通用内存存储，前端可从内存读取展示
         private async Task SendSequentialAsync(IEnumerable<CyclicTaskModel> tasks, CancellationToken ct = default)
         {
             if (tasks == null) return;
@@ -334,22 +199,42 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
             {
                 ct.ThrowIfCancellationRequested();
 
+                string resultMessage = string.Empty;
+                bool success = false;
+
                 try
                 {
-                    var (success, message) = await _wcsTaskHttpService.SendTaskAsync(t, "TargetSystem", ct).ConfigureAwait(false);
-                    if (success)
+                    var (sendSuccess, message) = await _wcsTaskHttpService.SendTaskAsync(t, "TargetSystem", ct).ConfigureAwait(false);
+                    success = sendSuccess;
+                    resultMessage = message ?? string.Empty;
+
+                    if (sendSuccess)
                         _logger?.LogInformation("任务下发成功 TaskNo={TaskNo}", t.TaskNo);
                     else
                         _logger?.LogWarning("任务下发失败 TaskNo={TaskNo} Msg={Msg}", t.TaskNo, message);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
+                    success = false;
+                    resultMessage = "已取消";
                     _logger?.LogWarning("任务下发被取消 TaskNo={TaskNo}", t.TaskNo);
                     throw;
                 }
                 catch (Exception ex)
                 {
+                    success = false;
+                    resultMessage = ex.Message;
                     _logger?.LogError(ex, "任务下发异常 TaskNo={TaskNo}", t.TaskNo);
+                }
+
+                // 将本次发送结果追加到内存存储的结果列表（线程安全写入）
+                var record = new DeliveryResult(t, success, resultMessage, DateTime.UtcNow);
+                lock (_memoryLock)
+                {
+                    var list = _appMemoryStore.GetOrDefault<List<DeliveryResult>>() ?? new List<DeliveryResult>();
+                    // 新 list 避免并发读写影响引用
+                    var newList = new List<DeliveryResult>(list) { record };
+                    _appMemoryStore.Set(newList);
                 }
 
                 // 可选短延迟，防止瞬时过载目标系统（按需调整或移除）
