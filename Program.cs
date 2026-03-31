@@ -44,8 +44,11 @@ builder.Services.AddScoped<IAppMemoryStore, AppMemoryStore>();
 // 注册数据库访问服务（使用配置读取器）
 builder.Services.AddScoped<IRcsDbService, RcsDbService>();
 
-// 注册TWD项目循环任务下发服务
-builder.Services.AddScoped<ICyclicTasksIssuing, CyclicTasksIssuingTWD>();
+// 注册循环任务通用服务
+builder.Services.AddScoped<ICyclicTasksIssuing, CyclicTasksIssuing>();
+
+//注册特定项目的循环任务服务
+builder.Services.AddScoped<TWDproject>();
 
 var app = builder.Build();
 

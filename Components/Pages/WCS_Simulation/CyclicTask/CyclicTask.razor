@@ -10,6 +10,7 @@
 @inject ICyclicTasksIssuing CyclicTasksIssuing
 @inject ISnackbar Snackbar
 @inject IAppMemoryStore _appMemoryStore
+@inject TWDproject TWDproject
 
 <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
     <MudGrid Spacing="3">
@@ -38,7 +39,6 @@
                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="TestConnectionAsync" StartIcon="@Icons.Material.Filled.WifiTethering">
                                     测试连接（并保存配置）
                                 </MudButton>
-
                                 <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="DisconnectAsync" StartIcon="@Icons.Material.Filled.LinkOff">
                                     断开数据库
                                 </MudButton>
@@ -49,11 +49,32 @@
                             </div>
                         </MudStack>
 
-                        <div>
-                            <MudText Typo="Typo.subtitle2">连接状态</MudText>
-                            <MudChip T="string" Color="@GetStatusColorFromCfg()" Variant="Variant.Filled" StartIcon="@GetStatusIconFromCfg()">
-                                @_cfg.ConnectionState.ToString()
-                            </MudChip>
+                        <!-- 替换原来显示连接状态的 <div> 节点，保留其周边结构 -->
+                        <div class="status-and-inventory" style="display:flex;align-items:center;gap:12px;">
+                            <div>
+                                <MudText Typo="Typo.subtitle2">连接状态</MudText>
+                                <MudChip T="string" Color="@GetStatusColorFromCfg()" Variant="Variant.Filled" StartIcon="@GetStatusIconFromCfg()">
+                                    @_cfg.ConnectionState.ToString()
+                                </MudChip>
+                            </div>
+
+                            <!-- 库存信息（托盘架 / 货物），点击可刷新 -->
+                            <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                                <MudPaper Elevation="0" Class="pa-2" Style="display:flex;gap:8px;align-items:center;">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudText Typo="Typo.caption" Class="mb-0">库存</MudText>
+                                        <div style="display:flex;gap:6px;align-items:center;">
+                                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Storage">
+                                                托盘: @_totalTrays
+                                            </MudChip>
+                                            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.LocalShipping">
+                                                货物: @_totalCargo
+                                            </MudChip>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Color="Color.Default" OnClick="RefreshInventoryAsync" />
+                                        </div>
+                                    </MudStack>
+                                </MudPaper>
+                            </div>
                         </div>
 
                         <MudDivider Class="my-2" />
@@ -167,6 +188,24 @@
 </MudContainer>
 
 <style>
+    /*左列右列样式 */
+    /* 使 modern-card 有默认卡片外观并支持伸缩布局 */
+    .modern-card {
+        border-radius: 8px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+        background: var(--mud-palette-surface, #fff);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* h-100 表示占满父容器高度（配合 Grid/Item 使用） */
+    .h-100 {
+        height: 100%;
+        min-height: 0;
+    }
+
+
     /* btn-group 固定只包裹按钮，不随状态文本变化伸缩 */
     .conn-controls .btn-group {
         display: flex;
@@ -220,72 +259,76 @@
         margin-top: auto;
     }
 
-    
     </style>
 
 @code {
-	[Inject] private ISnackbar SnackbarInject { get; set; } = default!;
+    [Inject] private ISnackbar SnackbarInject { get; set; } = default!;
 
-	private RcsConnectionConfig _cfg = new();
+    private RcsConnectionConfig _cfg = new();
 
-	// 看板数据模型
-	private sealed record BoardTask(string TaskNo, string TaskType, string SourceLocation, string TargetLocation, int Priority, string Status);
+    // 看板数据模型
+    private sealed record BoardTask(string TaskNo, string TaskType, string SourceLocation, string TargetLocation, int Priority, string Status);
 
-	private string _lastCheckedText = "未检测";
-	public string LastCheckedText
-	{
-		get => _lastCheckedText;
-		private set
-		{
-			_lastCheckedText = value;
-			LogStatusChange(_lastCheckedText);
-		}
-	}
+    private string _lastCheckedText = "未检测";
+    public string LastCheckedText
+    {
+        get => _lastCheckedText;
+        private set
+        {
+            _lastCheckedText = value;
+            LogStatusChange(_lastCheckedText);
+        }
+    }
 
-	private string _logText = $"{DateTime.Now:HH:mm:ss} [info] 等待下发周期任务";
+    private string _logText = $"{DateTime.Now:HH:mm:ss} [info] 等待下发周期任务";
 
-	private CancellationTokenSource? _monitorCts;
-	private bool _cycleRunning = false;
+    private CancellationTokenSource? _monitorCts;
+    private bool _cycleRunning = false;
 
-	private string? _selectedProject;
-	private readonly List<string> _projectOptions = new()
+    private string? _selectedProject;
+    private readonly List<string> _projectOptions = new()
     {
         "泰国TWD项目",
         "项目B",
         "项目C"
     };
 
-	// 执行次数
-	private int _cycleTimes = 10;
+    // 执行次数
+    private int _cycleTimes = 10;
 
-	// 内存中读取的原始 Board 列表（全量）
-	private List<BoardTask> _boardTasks = new();
+    // 内存中读取的原始 Board 列表（全量）
+    private List<BoardTask> _boardTasks = new();
 
-	// 当前页显示的数据
-	private List<BoardTask> _pagedBoardTasks = new();
+    // 当前页显示的数据
+    private List<BoardTask> _pagedBoardTasks = new();
 
-	// 轮询内存的任务（读取 DeliveryResult 列表）并刷新 UI
-	private CancellationTokenSource? _boardMonitorCts;
+    // 轮询内存的任务（读取 DeliveryResult 列表）并刷新 UI
+    private CancellationTokenSource? _boardMonitorCts;
 
-	// 分页 / 显示控制
-	private int _pageSize = 20;
-	private int _currentPage = 1;
-	private int _totalPages = 1;
-	private int _totalItems = 0;
-	private bool _ascending = true; // 顺序显示 (true = 旧到新)
+    // 分页 / 显示控制
+    private int _pageSize = 20;
+    private int _currentPage = 1;
+    private int _totalPages = 1;
+    private int _totalItems = 0;
+    private bool _ascending = true; // 顺序显示 (true = 旧到新)
 
-	protected override void OnInitialized()
-	{
-		var stored = _appMemoryStore.GetOrDefault<RcsConnectionConfig>();
-		if (stored is not null)
-		{
-			_cfg = stored.Clone();
-			LastCheckedText = stored.LastCheckedUtc.HasValue
-				? $"已加载：{stored.LastCheckedUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss} {stored.LastStatusMessage}"
-				: "已加载内存配置";
-		}
+    // 新增字段（放在其它私有字段附近）
+    private int _totalTrays = 0;
+    private int _totalCargo = 0;
+    private bool _inventoryLoading = false;
 
-		StartBoardMonitor();
+    protected async override void OnInitialized()
+    {
+        var stored = _appMemoryStore.GetOrDefault<RcsConnectionConfig>();
+        if (stored is not null)
+        {
+            _cfg = stored.Clone();
+            LastCheckedText = stored.LastCheckedUtc.HasValue
+                ? $"已加载：{stored.LastCheckedUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss} {stored.LastStatusMessage}"
+                : "已加载内存配置";
+        }
+        await RefreshInventoryAsync();
+        StartBoardMonitor();
 	}
 
 	private void StartBoardMonitor()
@@ -385,7 +428,7 @@
         var times = ParseCycleTimes();
 
         if (_selectedProject == "泰国TWD项目")
-            _ = CyclicTasksIssuing.Thailand_TWD(times);
+            _ = TWDproject.Thailand_TWD(times);
     }
 
     private int ParseCycleTimes() => Math.Max(1, _cycleTimes);
@@ -417,7 +460,20 @@
         await InvokeAsync(StateHasChanged);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(1, _cfg.ConnectTimeoutSeconds)));
-        await RcsDbService.TestConnectionAsync(cts.Token);
+        var ok = await RcsDbService.TestConnectionAsync(cts.Token);
+
+        // 测试连接后立即读取库存并显示（失败也尝试读取以反映最新）
+        try
+        {
+            var (trays, cargo) = await CyclicTasksIssuing.CalculateInventory();
+            _totalTrays = trays;
+            _totalCargo = cargo;
+        }
+        catch
+        {
+            // 可选：记录或通知
+            Snackbar?.Add("读取库存失败", Severity.Warning);
+        }
 
         _cfg = _appMemoryStore.GetOrDefault<RcsConnectionConfig>() ?? new RcsConnectionConfig();
         LastCheckedText = _cfg.LastCheckedUtc.HasValue
@@ -436,6 +492,29 @@
         _cfg = _appMemoryStore.GetOrDefault<RcsConnectionConfig>() ?? new RcsConnectionConfig();
         LastCheckedText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 数据库已断开";
         await InvokeAsync(StateHasChanged);
+    }
+
+    // 手动刷新库存（供刷新按钮使用）
+    private async Task RefreshInventoryAsync()
+    {
+        _inventoryLoading = true;
+        try
+        {
+            var (trays, cargo) = await CyclicTasksIssuing.CalculateInventory();
+            _totalTrays = trays;
+            _totalCargo = cargo;
+            Snackbar?.Add("刷新库存成功", Severity.Success);
+        }
+        catch
+        {
+            // 忽略错误或显示提示
+            Snackbar?.Add("刷新库存失败", Severity.Warning);
+        }
+        finally
+        {
+            _inventoryLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private void AddLog(string level, string message)
