@@ -11,11 +11,12 @@
 @inject ISnackbar Snackbar
 @inject IAppMemoryStore _appMemoryStore
 @inject TWDproject TWDproject
+@inject NavigationManager NavManager
 
 <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
     <MudGrid Spacing="3">
         <!-- 左列：RCS 连接 / 周期任务控制 -->
-        <MudItem xs="12" md="4">
+        <MudItem xs="12" md="3">
             <MudCard Class="modern-card h-100">
                 <MudCardHeader>
                     <CardHeaderContent>
@@ -43,11 +44,11 @@
                                     断开数据库
                                 </MudButton>
                             </div>
-
-                            <div class="status-wrapper">
-                                <MudText Typo="Typo.caption" Class="status-text ml-2">@LastCheckedText</MudText>
-                            </div>
                         </MudStack>
+
+                        <div class="status-wrapper">
+                            <MudText Typo="Typo.caption" Class="status-text ml-2">@LastCheckedText</MudText>
+                        </div>
 
                         <!-- 替换原来显示连接状态的 <div> 节点，保留其周边结构 -->
                         <div class="status-and-inventory" style="display:flex;align-items:center;gap:12px;">
@@ -116,8 +117,76 @@
             </MudCard>
         </MudItem>
 
+        <!-- 中间列：业务流程（使用外层 div 捕获点击事件，确保 @onclick 被触发） -->
+        <MudItem xs="12" md="3">
+            <div @onclick="OnBusinessFlowClicked" style="cursor:pointer;">
+                <MudCard Class="modern-card business-flow-preview"
+                         Style="@(_selectedProject == "泰国TWD项目" ? "border:1px solid rgba(0,0,0,0.06);" : "")">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">
+                                <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
+                                业务流程
+                                <span style="font-size:0.85rem;color:var(--mud-palette-text-secondary);margin-left:8px;">
+                                    (@(_selectedProject ?? "未选择具体项目"))
+                                </span>
+                            </MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            @if (_selectedProject == "泰国TWD项目")
+                            {
+                                <MudChip T="string" Color="Color.Info" Size="Size.Small">查看详情</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Color="Color.Default" Size="Size.Small">仅预览</MudChip>
+                            }
+                        </CardHeaderActions>
+                    </MudCardHeader>
+
+                    <MudCardContent>
+                        <MudStack Spacing="2">
+                            <MudPaper Elevation="0" Class="pa-2" Style="border-radius:6px;">
+                                <MudText Typo="Typo.body2" Class="mb-0">
+                                    本业务流程依赖于 GRCS 10.1 及以上版本。
+                                </MudText>
+                            </MudPaper>
+
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Class="mb-1">接驳位信号下发（示意）</MudText>
+                                <MudGrid Gutter="2">
+                                    @for (int i = 1; i <= 10; i++)
+                                    {
+                                        <MudItem xs="6" sm="4" md="2">
+                                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="w-100" Disabled="true">
+                                                接驳 @i
+                                            </MudButton>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </div>
+
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Class="mb-1">分拣台信号下发（示意）</MudText>
+                                <MudGrid Gutter="2">
+                                    @for (int i = 1; i <= 10; i++)
+                                    {
+                                        <MudItem xs="6" sm="4" md="2">
+                                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Class="w-100" Disabled="true">
+                                                分拣 @i
+                                            </MudButton>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </div>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </div>
+        </MudItem>
+
         <!-- 右列：任务看板（从内存读取并展示） -->
-        <MudItem xs="12" md="8">
+        <MudItem xs="12" md="6">
             <MudCard Class="modern-card h-100">
                 <MudCardHeader>
                     <CardHeaderContent>
@@ -305,7 +374,7 @@
     // 轮询内存的任务（读取 DeliveryResult 列表）并刷新 UI
     private CancellationTokenSource? _boardMonitorCts;
 
-    // 分页 / 显示控制
+    // 分页 / 昔令控制
     private int _pageSize = 20;
     private int _currentPage = 1;
     private int _totalPages = 1;
@@ -365,7 +434,7 @@
 				dr.Task.SourceLocation,
 				dr.Task.TargetLocation,
 				dr.Task.Priority,
-				dr.Success ? "已完成" : "失败"))
+				dr.Status.ToString()))
 			.ToList();
 
 		// 更新全量与分页信息
@@ -594,5 +663,39 @@
             logLevel = "INFO";
 
         AddLog(logLevel, statusText);
+    }
+
+    private void NavigateToBusinessFlow()
+    {
+        if (_selectedProject == "泰国TWD项目")
+        {
+            NavManager.NavigateTo("/wcs-simulation/cyclic-task/business-flow");
+        }
+        else
+        {
+            Snackbar?.Add("请选择 泰国TWD项目 后查看业务流程详情", Severity.Warning);
+        }
+    }
+
+    private Task OnBusinessFlowClicked()
+    {
+        if (_selectedProject == "泰国TWD项目")
+        {
+            NavigateToBusinessFlow();
+        }
+        else if (_selectedProject == "项目B")
+        {
+            Snackbar?.Add("项目B未开发", Severity.Warning);
+        }
+        else if (_selectedProject == "项目C")
+        {
+            Snackbar?.Add("项目C未开发", Severity.Warning);
+        }
+        else
+        {
+            Snackbar?.Add("未选择对应项目", Severity.Warning);
+        }
+
+        return Task.CompletedTask;
     }
 }

@@ -4,8 +4,20 @@ using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Services;
 
 namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject
 {
+    // 任务状态枚举（按需扩展）
+    public enum DeliveryStatus
+    {
+        Unknown = 0,
+        Pending,      // 尚未下发
+        Submitted,    // 已下发/提交到 WCS
+        InProgress,   // RCS 已开始任务 (START)
+        LoadFinished, // RCS 取货完成 (LOAD_FINISH)
+        Done,         // 任务完成 (FINISHED)
+        Failed,       // 失败
+        Cancelled     // 取消
+    }
     // 定义结果记录，前端可以直接读取这个列表展示成功/失败及原因
-    public record DeliveryResult(CyclicTaskModel Task, bool Success, string Message, DateTime Time);
+    public record DeliveryResult(CyclicTaskModel Task, DeliveryStatus Status, string Message, DateTime Time);
 
     // 定义三个记录类型：StorageAreaRecord（包含 cargo 字段），AreaRecord（不包含 cargo 字段），以及它们的快照类型
     public record StorageAreaRecord(string WmsCode, string Cargo, DateTime RetrievedAt);
@@ -117,12 +129,12 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
                 ct.ThrowIfCancellationRequested();
 
                 string resultMessage = string.Empty;
-                bool success = false;
+                DeliveryStatus success = DeliveryStatus.Failed;
 
                 try
                 {
                     var (sendSuccess, message) = await _wcsTaskHttpService.SendTaskAsync(t, "TargetSystem", ct).ConfigureAwait(false);
-                    success = sendSuccess;
+                    success = sendSuccess ? DeliveryStatus.Submitted : DeliveryStatus.Failed;
                     resultMessage = message ?? string.Empty;
 
                     if (sendSuccess)
@@ -132,14 +144,14 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    success = false;
+                    success = DeliveryStatus.Failed;
                     resultMessage = "已取消";
                     _logger?.LogWarning("任务下发被取消 TaskNo={TaskNo}", t.TaskNo);
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    success = false;
+                    success = DeliveryStatus.Failed;
                     resultMessage = ex.Message;
                     _logger?.LogError(ex, "任务下发异常 TaskNo={TaskNo}", t.TaskNo);
                 }

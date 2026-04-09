@@ -1,0 +1,83 @@
+@page "/wcs-simulation/cyclic-task/business-flow"
+@using MudBlazor
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
+                    业务流程 — 详细页面
+                </MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@GoBack">
+                    返回
+                </MudButton>
+            </CardHeaderActions>
+        </MudCardHeader>
+
+        <MudCardContent>
+            <MudStack Spacing="2">
+                <MudPaper Elevation="0" Class="pa-2" Style="border-radius:6px;">
+                    <MudText Typo="Typo.body2" Class="mb-0">
+                        本业务流程依赖于 GRCS 10.1 及以上版本。
+                    </MudText>
+                </MudPaper>
+
+                <div>
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">接驳位模拟信号下发</MudText>
+                    <MudGrid Gutter="2">
+                        @for (int i = 1; i <= 10; i++)
+                        {
+                            <MudItem xs="6" sm="4" md="2">
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           Class="w-100"
+                                           OnClick="@(()=>OnDockClicked(i))">
+                                    接驳 @i
+                                </MudButton>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </div>
+
+                <div>
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">分拣台模拟信号下发</MudText>
+                    <MudGrid Gutter="2">
+                        @for (int i = 1; i <= 10; i++)
+                        {
+                            <MudItem xs="6" sm="4" md="2">
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Secondary"
+                                           Class="w-100"
+                                           OnClick="@(()=>OnSortClicked(i))">
+                                    分拣 @i
+                                </MudButton>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </div>
+            </MudStack>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/wcs-simulation/cyclic-task");
+    }
+
+    private void OnDockClicked(int index)
+    {
+        Snackbar?.Add($"接驳位 {index} 触发（占位）", Severity.Info);
+    }
+
+    private void OnSortClicked(int index)
+    {
+        Snackbar?.Add($"分拣台 {index} 触发（占位）", Severity.Info);
+    }
+}

@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <Folder Include="Components\Pages\WCS_Simulation\Config\Services\" />
+    <Folder Include="Components\Pages\WCS_Simulation\Shared\Controller\Models\" />
   </ItemGroup>
 
 </Project>

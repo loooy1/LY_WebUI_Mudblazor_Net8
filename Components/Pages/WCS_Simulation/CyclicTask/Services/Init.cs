@@ -7,23 +7,10 @@ using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Models;
 using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Services; // 新增
 using Microsoft.Extensions.Logging;
 using MySqlConnector;
+using LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject;
 
-namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services.TWDproject
+namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Services
 {
-    //// 定义结果记录，前端可以直接读取这个列表展示成功/失败及原因
-    //public record DeliveryResult(CyclicTaskModel Task, bool Success, string Message, DateTime Time);
-
-    //// 定义三个记录类型：StorageAreaRecord（包含 cargo 字段），AreaRecord（不包含 cargo 字段），以及它们的快照类型
-    //public record StorageAreaRecord(string WmsCode, string Cargo, DateTime RetrievedAt);
-
-    //// StorageAreaSnapshot 包含 StorageAreaRecord 列表和快照时间
-    //public record StorageAreaSnapshot(IReadOnlyList<StorageAreaRecord> Items, DateTime SnapshotTime);
-
-    //// ConveyorArea 和 SortingArea 只需要 WmsCode 和 RetrievedAt，因此使用 AreaRecord
-    //public record AreaRecord(string WmsCode, DateTime RetrievedAt);
-
-    //// ConveyorAreaSnapshot 和 SortingAreaSnapshot 都使用 AreaRecord 列表和快照时间
-    //public record AreaSnapshot(IReadOnlyList<AreaRecord> Items, DateTime SnapshotTime);
 
     //rcs数据库中货物实例的统计结果
     public record StorageCounts(int TotalTrays, int TotalCargo);
