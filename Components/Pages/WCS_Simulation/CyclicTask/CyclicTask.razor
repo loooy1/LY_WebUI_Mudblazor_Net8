@@ -15,74 +15,77 @@
 
 <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
     <MudGrid Spacing="3">
-        <!-- 左列：RCS 连接 / 周期任务控制 -->
-        <MudItem xs="12" md="3">
+        <!-- 上侧：RCS 连接 / 周期任务控制 -->
+        <MudItem xs="12" md="12">
             <MudCard Class="modern-card h-100">
                 <MudCardHeader>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">
-                            <MudIcon Icon="@Icons.Material.Filled.Storage" Class="mr-2" />
+                        <MudIconButton Icon="@(_rscExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Size="Size.Medium" Color="Color.Default" OnClick="ToggleRcsCollapse" />
+                        <MudText Typo="Typo.h6" Style="display:inline-block;margin-left:8px;">
                             RCS 连接设置
                         </MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
 
                 <MudCardContent>
-                    <MudStack Spacing="2">
-                        <MudTextField Label="RCS 主机/IP" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.Host" />
-                        <MudNumericField T="int" Label="端口" Variant="Variant.Outlined" Dense="true" Min="1" Max="65535" @bind-Value="_cfg.Port" />
-                        <MudTextField Label="用户名" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.User" />
-                        <MudTextField Label="密码" Variant="Variant.Outlined" Dense="true" InputType="InputType.Password" @bind-Value="_cfg.Password" />
-                        <MudTextField Label="数据库名" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.Database" />
+                    <MudCollapse Expanded="@_rscExpanded">
+                        <MudStack Spacing="2">
+                            <MudTextField Label="RCS 主机/IP" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.Host" />
+                            <MudNumericField T="int" Label="端口" Variant="Variant.Outlined" Dense="true" Min="1" Max="65535" @bind-Value="_cfg.Port" />
+                            <MudTextField Label="用户名" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.User" />
+                            <MudTextField Label="密码" Variant="Variant.Outlined" Dense="true" InputType="InputType.Password" @bind-Value="_cfg.Password" />
+                            <MudTextField Label="数据库名" Variant="Variant.Outlined" Dense="true" @bind-Value="_cfg.Database" />
 
-                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="conn-controls">
-                            <div class="btn-group">
-                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="TestConnectionAsync" StartIcon="@Icons.Material.Filled.WifiTethering">
-                                    测试连接（并保存配置）
-                                </MudButton>
-                                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="DisconnectAsync" StartIcon="@Icons.Material.Filled.LinkOff">
-                                    断开数据库
-                                </MudButton>
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="conn-controls">
+                                <div class="btn-group">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="TestConnectionAsync" StartIcon="@Icons.Material.Filled.WifiTethering">
+                                        测试连接（并保存配置）
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="DisconnectAsync" StartIcon="@Icons.Material.Filled.LinkOff">
+                                        断开数据库
+                                    </MudButton>
+                                </div>
+                            </MudStack>
+
+                            <div class="status-wrapper">
+                                <MudText Typo="Typo.caption" Class="status-text ml-2">@LastCheckedText</MudText>
+                            </div>
+
+                            <!-- 替换原来显示连接状态的 <div> 节点，保留其周边结构 -->
+                            <div class="status-and-inventory" style="display:flex;align-items:center;gap:12px;">
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">连接状态</MudText>
+                                    <MudChip T="string" Color="@GetStatusColorFromCfg()" Variant="Variant.Filled" StartIcon="@GetStatusIconFromCfg()">
+                                        @_cfg.ConnectionState.ToString()
+                                    </MudChip>
+                                </div>
+
+                                <!-- 库存信息（托盘架 / 货物），点击可刷新 -->
+                                <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+                                    <MudPaper Elevation="0" Class="pa-2" Style="display:flex;gap:8px;align-items:center;">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudText Typo="Typo.caption" Class="mb-0">库存</MudText>
+                                            <div style="display:flex;gap:6px;align-items:center;">
+                                                <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Storage">
+                                                    托盘: @_totalTrays
+                                                </MudChip>
+                                                <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.LocalShipping">
+                                                    货物: @_totalCargo
+                                                </MudChip>
+                                                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Color="Color.Default" OnClick="RefreshInventoryAsync" />
+                                            </div>
+                                        </MudStack>
+                                    </MudPaper>
+                                </div>
                             </div>
                         </MudStack>
+                    </MudCollapse>
 
-                        <div class="status-wrapper">
-                            <MudText Typo="Typo.caption" Class="status-text ml-2">@LastCheckedText</MudText>
-                        </div>
+                    <MudDivider Class="my-2" />
 
-                        <!-- 替换原来显示连接状态的 <div> 节点，保留其周边结构 -->
-                        <div class="status-and-inventory" style="display:flex;align-items:center;gap:12px;">
-                            <div>
-                                <MudText Typo="Typo.subtitle2">连接状态</MudText>
-                                <MudChip T="string" Color="@GetStatusColorFromCfg()" Variant="Variant.Filled" StartIcon="@GetStatusIconFromCfg()">
-                                    @_cfg.ConnectionState.ToString()
-                                </MudChip>
-                            </div>
+                    <MudText Typo="Typo.h6">周期任务</MudText>
 
-                            <!-- 库存信息（托盘架 / 货物），点击可刷新 -->
-                            <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-                                <MudPaper Elevation="0" Class="pa-2" Style="display:flex;gap:8px;align-items:center;">
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                        <MudText Typo="Typo.caption" Class="mb-0">库存</MudText>
-                                        <div style="display:flex;gap:6px;align-items:center;">
-                                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Storage">
-                                                托盘: @_totalTrays
-                                            </MudChip>
-                                            <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.LocalShipping">
-                                                货物: @_totalCargo
-                                            </MudChip>
-                                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Color="Color.Default" OnClick="RefreshInventoryAsync" />
-                                        </div>
-                                    </MudStack>
-                                </MudPaper>
-                            </div>
-                        </div>
-
-                        <MudDivider Class="my-2" />
-
-                        <MudText Typo="Typo.h6">周期任务</MudText>
-
-                        <MudStack Spacing="1">
+                    <MudStack Spacing="1">
                             <MudSelect T="string" Label="选择项目/周期任务" Variant="Variant.Outlined" Dense="true" @bind-Value="_selectedProject">
                                 @foreach (var p in _projectOptions)
                                 {
@@ -111,82 +114,12 @@
                             <MudText Typo="Typo.caption" Class="mt-2">@_logText</MudText>
                             <MudText Typo="Typo.caption" Class="mt-1">说明：根据选择的项目，后台会执行对应周期任务</MudText>
                         </MudStack>
-
-                    </MudStack>
                 </MudCardContent>
             </MudCard>
         </MudItem>
 
-        <!-- 中间列：业务流程（使用外层 div 捕获点击事件，确保 @onclick 被触发） -->
-        <MudItem xs="12" md="3">
-            <div @onclick="OnBusinessFlowClicked" style="cursor:pointer;">
-                <MudCard Class="modern-card business-flow-preview"
-                         Style="@(_selectedProject == "泰国TWD项目" ? "border:1px solid rgba(0,0,0,0.06);" : "")">
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">
-                                <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
-                                业务流程
-                                <span style="font-size:0.85rem;color:var(--mud-palette-text-secondary);margin-left:8px;">
-                                    (@(_selectedProject ?? "未选择具体项目"))
-                                </span>
-                            </MudText>
-                        </CardHeaderContent>
-                        <CardHeaderActions>
-                            @if (_selectedProject == "泰国TWD项目")
-                            {
-                                <MudChip T="string" Color="Color.Info" Size="Size.Small">查看详情</MudChip>
-                            }
-                            else
-                            {
-                                <MudChip T="string" Color="Color.Default" Size="Size.Small">仅预览</MudChip>
-                            }
-                        </CardHeaderActions>
-                    </MudCardHeader>
-
-                    <MudCardContent>
-                        <MudStack Spacing="2">
-                            <MudPaper Elevation="0" Class="pa-2" Style="border-radius:6px;">
-                                <MudText Typo="Typo.body2" Class="mb-0">
-                                    本业务流程依赖于 GRCS 10.1 及以上版本。
-                                </MudText>
-                            </MudPaper>
-
-                            <div>
-                                <MudText Typo="Typo.subtitle2" Class="mb-1">接驳位信号下发（示意）</MudText>
-                                <MudGrid Gutter="2">
-                                    @for (int i = 1; i <= 10; i++)
-                                    {
-                                        <MudItem xs="6" sm="4" md="2">
-                                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="w-100" Disabled="true">
-                                                接驳 @i
-                                            </MudButton>
-                                        </MudItem>
-                                    }
-                                </MudGrid>
-                            </div>
-
-                            <div>
-                                <MudText Typo="Typo.subtitle2" Class="mb-1">分拣台信号下发（示意）</MudText>
-                                <MudGrid Gutter="2">
-                                    @for (int i = 1; i <= 10; i++)
-                                    {
-                                        <MudItem xs="6" sm="4" md="2">
-                                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Class="w-100" Disabled="true">
-                                                分拣 @i
-                                            </MudButton>
-                                        </MudItem>
-                                    }
-                                </MudGrid>
-                            </div>
-                        </MudStack>
-                    </MudCardContent>
-                </MudCard>
-            </div>
-        </MudItem>
-
-        <!-- 右列：任务看板（从内存读取并展示） -->
-        <MudItem xs="12" md="6">
+        <!-- 左列：任务看板（从内存读取并展示） -->
+        <MudItem xs="12" md="6" Style="order:0;">
             <MudCard Class="modern-card h-100">
                 <MudCardHeader>
                     <CardHeaderContent>
@@ -225,14 +158,20 @@
                                 <MudTh>状态</MudTh>
                             </HeaderContent>
                             <RowTemplate>
-                                <MudTd DataLabel="任务号">@context.TaskNo</MudTd>
-                                <MudTd DataLabel="类型">@context.TaskType</MudTd>
-                                <MudTd DataLabel="来源">@context.SourceLocation</MudTd>
-                                <MudTd DataLabel="目标">@context.TargetLocation</MudTd>
-                                <MudTd DataLabel="优先级">@context.Priority</MudTd>
-                                <MudTd DataLabel="状态">
-                                    <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
-                                </MudTd>
+                            <MudTd DataLabel="任务号">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <MudIconButton Icon="@( _selectedDetailTaskNo == context.TaskNo ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore )"
+                                                   Size="Size.Small" Color="Color.Default" OnClick="() => ToggleExpand(context.TaskNo)" />
+                                    <div>@context.TaskNo</div>
+                                </div>
+                            </MudTd>
+                            <MudTd DataLabel="类型">@context.TaskType</MudTd>
+                            <MudTd DataLabel="来源">@context.SourceLocation</MudTd>
+                            <MudTd DataLabel="目标">@context.TargetLocation</MudTd>
+                            <MudTd DataLabel="优先级">@context.Priority</MudTd>
+                            <MudTd DataLabel="状态">
+                                <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
+                            </MudTd>
                             </RowTemplate>
                         </MudTable>
                     </div>
@@ -250,6 +189,93 @@
                             <MudText Typo="Typo.caption">共 @_totalItems 条</MudText>
                         </MudStack>
                     </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- 右侧详情栏：显示所选任务的阶段与操作 -->
+        <MudItem xs="12" md="6">
+            <MudCard Class="modern-card h-100">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                            任务详情
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+
+                <MudCardContent>
+                    @if (string.IsNullOrEmpty(_selectedDetailTaskNo))
+                    {
+                        <div style="color:var(--mud-palette-text-secondary);">请选择左侧表格中的任务以查看详情</div>
+                    }
+                    else
+                    {
+                        var detail = _boardTasks.FirstOrDefault(b => b.TaskNo == _selectedDetailTaskNo);
+                        if (detail is null)
+                        {
+                            <div style="color:var(--mud-palette-text-secondary);">未找到对应任务</div>
+                        }
+                        else
+                        {
+                            <div style="display:flex;flex-direction:column;gap:8px;">
+                                <div style="font-weight:700;">@detail.TaskNo — @detail.TaskType</div>
+                                <div style="color:var(--mud-palette-text-secondary);">来源: @detail.SourceLocation &nbsp; | &nbsp; 目标: @detail.TargetLocation &nbsp; | &nbsp; 优先级: @detail.Priority</div>
+
+                                <MudDivider Class="my-1" />
+
+                                <div style="display:flex;flex-direction:column;gap:6px;">
+                                    @*
+       逻辑说明：
+       我们遍历除了 UNKNOWN 之外的所有状态。
+       通过比较 (int)detail.RawStatus 和 (int)stage 来判断颜色。
+    *@
+                                    @foreach (var stage in Enum.GetValues(typeof(DeliveryStatus)).Cast<DeliveryStatus>().Where(s => s != DeliveryStatus.UNKNOWN))
+                                    {
+                                        // 1. 计算当前行的状态颜色
+                                        var isDone = (int)detail.RawStatus >= (int)stage;
+                                        var isCurrent = (int)detail.RawStatus == (int)stage;
+                                        var color = isDone ? Color.Success : (isCurrent ? Color.Info : Color.Default);
+        
+                                        // 2. 计算图标
+                                        var icon = isDone ? Icons.Material.Filled.CheckCircle : (isCurrent ? Icons.Material.Filled.PlayCircle : Icons.Material.Filled.Circle);
+
+                                        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px solid var(--mud-palette-lines-default);border-radius:6px; background-color: @(isCurrent ? "var(--mud-palette-action-default-hover)" : "transparent");">
+            
+                                            <!-- 左侧：图标 + 芯片 + 描述 -->
+                                            <div style="display:flex;align-items:center;gap:10px; min-width:0;">
+                                                <MudIcon Icon="@icon" Color="@color" Size="Size.Small" />
+                
+                                                <MudChip T="string" Color="@color" Variant="Variant.Filled" Size="Size.Small" Style="font-weight:600;">
+                                                    @GetStageLabel(stage)
+                                                </MudChip>
+                
+                                                <span style="font-size:0.85rem;color:var(--mud-palette-text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                                    @(isDone ? "已完成" : (isCurrent ? "当前步骤" : "等待中"))
+                                                </span>
+                                            </div>
+
+                                            <!-- 右侧：操作按钮 -->
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       OnClick="() => SendSignalAsync(detail.TaskNo, stage)"
+                                                       Disabled="!isCurrent">
+                                                <!-- 只有当前步骤才允许点击 -->
+                                                下发信号
+                                            </MudButton>
+                                        </div>
+                                    }
+                                </div>
+                                
+
+                                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;">
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="() => _selectedDetailTaskNo = null">关闭</MudButton>
+                                </div>
+                            </div>
+                        }
+                    }
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -331,12 +357,15 @@
     </style>
 
 @code {
+
     [Inject] private ISnackbar SnackbarInject { get; set; } = default!;
 
     private RcsConnectionConfig _cfg = new();
+    // RCS 折叠面板状态
+    private bool _rscExpanded = true;
 
-    // 看板数据模型
-    private sealed record BoardTask(string TaskNo, string TaskType, string SourceLocation, string TargetLocation, int Priority, string Status);
+    // 看板数据模型（增加 RawStatus 以便显示分解的子任务阶段）
+    private sealed record BoardTask(string TaskNo, string TaskType, string SourceLocation, string TargetLocation, int Priority, string Status, DeliveryStatus RawStatus);
 
     private string _lastCheckedText = "未检测";
     public string LastCheckedText
@@ -347,6 +376,11 @@
             _lastCheckedText = value;
             LogStatusChange(_lastCheckedText);
         }
+    }
+
+    private void ToggleRcsCollapse()
+    {
+        _rscExpanded = !_rscExpanded;
     }
 
     private string _logText = $"{DateTime.Now:HH:mm:ss} [info] 等待下发周期任务";
@@ -370,6 +404,8 @@
 
     // 当前页显示的数据
     private List<BoardTask> _pagedBoardTasks = new();
+    // 当前选中的详情任务号（在 UI 中显示详细面板）
+    private string? _selectedDetailTaskNo;
 
     // 轮询内存的任务（读取 DeliveryResult 列表）并刷新 UI
     private CancellationTokenSource? _boardMonitorCts;
@@ -427,15 +463,39 @@
 
 		IEnumerable<DeliveryResult> ordered = _ascending ? results.AsEnumerable() : results.AsEnumerable().Reverse();
 
-		var mapped = ordered
-			.Select(dr => new BoardTask(
-				dr.Task.TaskNo,
-				dr.Task.TaskType,
-				dr.Task.SourceLocation,
-				dr.Task.TargetLocation,
-				dr.Task.Priority,
-				dr.Status.ToString()))
-			.ToList();
+        var mapped = ordered
+            .Select(dr => new BoardTask(
+                dr.Task.TaskNo,
+                dr.Task.TaskType,
+                dr.Task.SourceLocation,
+                dr.Task.TargetLocation,
+                dr.Task.Priority,                   
+                dr.Status switch
+                {
+                    DeliveryStatus.UNKNOWN => "未知",
+                    DeliveryStatus.PENDING => "待处理",
+                    DeliveryStatus.ISSUE => "已下发",
+                    DeliveryStatus.RCS_REQUEST_PICKUP => "请求取货",
+                    DeliveryStatus.WCS_ALLOW_PICKUP => "允许取货",
+                    DeliveryStatus.RCS_REQUEST_ENTER_START => "请求进入起点",
+                    DeliveryStatus.WCS_ALLOW_ENTER_START => "允许进入起点",
+                    DeliveryStatus.RCS_PICKUP_FINISHED => "取货完成",
+                    DeliveryStatus.RCS_REQUEST_LEAVE_START => "请求离开起点",
+                    DeliveryStatus.WCS_ALLOW_LEAVE_START => "允许离开起点",
+                    DeliveryStatus.MOVING_TO_TARGET => "移动中",
+                    DeliveryStatus.RCS_REQUEST_PUT => "请求放货",
+                    DeliveryStatus.WCS_ALLOW_PUT => "允许放货",
+                    DeliveryStatus.RCS_REQUEST_ENTER_END => "请求进入终点",
+                    DeliveryStatus.WCS_ALLOW_ENTER_END => "允许进入终点",
+                    DeliveryStatus.RCS_PUT_FINISHED => "放货完成",
+                    DeliveryStatus.RCS_REQUEST_LEAVE_END => "请求离开终点",
+                    DeliveryStatus.WCS_ALLOW_LEAVE_END => "允许离开终点",
+                    DeliveryStatus.FINISHED => "任务完成",
+                    DeliveryStatus.FAILED => "失败",
+                    DeliveryStatus.CANCELLED => "已取消",
+                    _ => dr.Status.ToString()
+                }, dr.Status))
+            .ToList();
 
 		// 更新全量与分页信息
 		_boardTasks = mapped;
@@ -559,7 +619,7 @@
         _monitorCts = null;
 
         _cfg = _appMemoryStore.GetOrDefault<RcsConnectionConfig>() ?? new RcsConnectionConfig();
-        LastCheckedText = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 数据库已断开";
+        LastCheckedText = $"{DateTime.Now:HH:mm:ss} 数据库已断开";
         await InvokeAsync(StateHasChanged);
     }
 
@@ -618,6 +678,36 @@
         };
     }
 
+    private void ToggleExpand(string taskNo)
+    {
+        if (string.IsNullOrEmpty(taskNo)) return;
+        if (_selectedDetailTaskNo == taskNo) _selectedDetailTaskNo = null;
+        else _selectedDetailTaskNo = taskNo;
+    }
+
+    private Color GetStageChipColor(DeliveryStatus currentStatus, DeliveryStatus stage)
+    {
+        // Orders: Submitted(2) < InProgress(3) < LoadFinished(4) < Done(5)
+        var cur = (int)currentStatus;
+        var st = (int)stage;
+        if (cur == st) return Color.Info; // current
+        if (cur > st) return Color.Success; // completed
+        return Color.Default; // pending
+    }
+
+    private async Task SendSignalAsync(string taskNo, DeliveryStatus stage)
+    {
+        // TODO: implement actual signal sending via service. For now show snackbar.
+        SnackbarInject?.Add($"已下发信号：{GetStageLabel(stage)}，任务 {taskNo}", Severity.Success);
+        await Task.CompletedTask;
+    }
+
+    private void ShowStageDetails(string taskNo, DeliveryStatus stage)
+    {
+        // Placeholder: show a snackbar or open a dialog in future
+        SnackbarInject?.Add($"查看阶段详情：{GetStageLabel(stage)}，任务 {taskNo}", Severity.Info);
+    }
+
     private string GetStatusIconFromCfg()
     {
         var s = _cfg.ConnectionState.ToString();
@@ -630,16 +720,25 @@
         };
     }
 
-    private Color GetStatusColor(string status) => status switch
+    private Color GetStatusColor(string status)
     {
-        "待处理" => Color.Warning,
-        "处理中" => Color.Info,
-        "已完成" => Color.Success,
-        "PENDING" => Color.Warning,
-        "IN_PROGRESS" => Color.Info,
-        "DONE" => Color.Success,
-        _ => Color.Default
-    };
+        if (string.IsNullOrWhiteSpace(status))
+            return Color.Default;
+
+        return status switch
+        {
+            // 中文显示值
+            "未知" => Color.Default,
+            "待处理" => Color.Warning,
+            "已下发" => Color.Warning,
+            "处理中" => Color.Info,
+            "取货完成" => Color.Info,
+            "已完成" => Color.Success,
+            "失败" => Color.Error,
+            "已取消" => Color.Default,
+            _ => Color.Default
+        };
+    }
 
     public void Dispose()
     {
@@ -665,37 +764,36 @@
         AddLog(logLevel, statusText);
     }
 
-    private void NavigateToBusinessFlow()
+    // 辅助方法：把枚举转成好看的中文显示
+    private string GetStageLabel(DeliveryStatus stage)
     {
-        if (_selectedProject == "泰国TWD项目")
+        return stage switch
         {
-            NavManager.NavigateTo("/wcs-simulation/cyclic-task/business-flow");
-        }
-        else
-        {
-            Snackbar?.Add("请选择 泰国TWD项目 后查看业务流程详情", Severity.Warning);
-        }
-    }
-
-    private Task OnBusinessFlowClicked()
-    {
-        if (_selectedProject == "泰国TWD项目")
-        {
-            NavigateToBusinessFlow();
-        }
-        else if (_selectedProject == "项目B")
-        {
-            Snackbar?.Add("项目B未开发", Severity.Warning);
-        }
-        else if (_selectedProject == "项目C")
-        {
-            Snackbar?.Add("项目C未开发", Severity.Warning);
-        }
-        else
-        {
-            Snackbar?.Add("未选择对应项目", Severity.Warning);
-        }
-
-        return Task.CompletedTask;
-    }
+            DeliveryStatus.PENDING => "待处理",
+            DeliveryStatus.ISSUE => "任务下发",
+            
+            DeliveryStatus.RCS_REQUEST_PICKUP => "RCS 请求取货",
+            DeliveryStatus.WCS_ALLOW_PICKUP => "WCS 允许取货",
+            DeliveryStatus.RCS_REQUEST_ENTER_START => "RCS 请求入起点",
+            DeliveryStatus.WCS_ALLOW_ENTER_START => "WCS 允许入起点",
+            DeliveryStatus.RCS_PICKUP_FINISHED => "RCS 取货完成",
+            DeliveryStatus.RCS_REQUEST_LEAVE_START => "RCS 请求离起点",
+            DeliveryStatus.WCS_ALLOW_LEAVE_START => "WCS 允许离起点",
+            
+            DeliveryStatus.MOVING_TO_TARGET => "移动至终点",
+            
+            DeliveryStatus.RCS_REQUEST_PUT => "RCS 请求放货",
+            DeliveryStatus.WCS_ALLOW_PUT => "WCS 允许放货",
+            DeliveryStatus.RCS_REQUEST_ENTER_END => "RCS 请求入终点",
+            DeliveryStatus.WCS_ALLOW_ENTER_END => "WCS 允许入终点",
+            DeliveryStatus.RCS_PUT_FINISHED => "RCS 放货完成",
+            DeliveryStatus.RCS_REQUEST_LEAVE_END => "RCS 请求离终点",
+            DeliveryStatus.WCS_ALLOW_LEAVE_END => "WCS 允许离终点",
+            
+            DeliveryStatus.FINISHED => "任务完成",
+            DeliveryStatus.FAILED => "任务失败",
+            DeliveryStatus.CANCELLED => "任务取消",
+            _ => stage.ToString()
+        };
+}
 }

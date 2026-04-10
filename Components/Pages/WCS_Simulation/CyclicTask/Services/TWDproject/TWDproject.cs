@@ -7,15 +7,38 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
     // 任务状态枚举（按需扩展）
     public enum DeliveryStatus
     {
-        Unknown = 0,
-        Pending,      // 尚未下发
-        Submitted,    // 已下发/提交到 WCS
-        InProgress,   // RCS 已开始任务 (START)
-        LoadFinished, // RCS 取货完成 (LOAD_FINISH)
-        Done,         // 任务完成 (FINISHED)
-        Failed,       // 失败
-        Cancelled     // 取消
+        UNKNOWN = 0,            // 0. 未知状态
+        PENDING,                // 1. 待处理/尚未下发
+
+        ISSUE,                  // 2. 已下发给 RCS (任务创建)
+
+        // --- 取货阶段 (起点) ---
+        RCS_REQUEST_PICKUP,     // 3. RCS 请求取货
+        WCS_ALLOW_PICKUP,       // 4. WCS 允许取货
+        RCS_REQUEST_ENTER_START,// 5. RCS 请求进入起点
+        WCS_ALLOW_ENTER_START,  // 6. WCS 允许进入起点
+        RCS_PICKUP_FINISHED,    // 7. RCS 取货完成上报
+        RCS_REQUEST_LEAVE_START,// 8. RCS 请求离开起点
+        WCS_ALLOW_LEAVE_START,  // 9. WCS 允许离开起点
+
+        // --- 移动与放货阶段 (终点) ---
+        MOVING_TO_TARGET,       // 10. 移动中 (可选过渡状态，非交互点)
+
+        RCS_REQUEST_PUT,        // 11. RCS 请求放货
+        WCS_ALLOW_PUT,          // 12. WCS 允许放货
+        RCS_REQUEST_ENTER_END,  // 13. RCS 请求进入终点
+        WCS_ALLOW_ENTER_END,    // 14. WCS 允许进入终点
+        RCS_PUT_FINISHED,       // 15. RCS 放货完成上报
+        RCS_REQUEST_LEAVE_END,  // 16. RCS 请求离开终点
+        WCS_ALLOW_LEAVE_END,    // 17. WCS 允许离开终点
+
+        // --- 终态 ---
+        FINISHED,               // 18. 任务完成
+        FAILED,                 // 19. 失败
+        CANCELLED               // 20. 取消
     }
+
+
     // 定义结果记录，前端可以直接读取这个列表展示成功/失败及原因
     public record DeliveryResult(CyclicTaskModel Task, DeliveryStatus Status, string Message, DateTime Time);
 
@@ -129,12 +152,12 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
                 ct.ThrowIfCancellationRequested();
 
                 string resultMessage = string.Empty;
-                DeliveryStatus success = DeliveryStatus.Failed;
+                DeliveryStatus success = DeliveryStatus.FAILED;
 
                 try
                 {
                     var (sendSuccess, message) = await _wcsTaskHttpService.SendTaskAsync(t, "TargetSystem", ct).ConfigureAwait(false);
-                    success = sendSuccess ? DeliveryStatus.Submitted : DeliveryStatus.Failed;
+                    success = sendSuccess ? DeliveryStatus.ISSUE : DeliveryStatus.FAILED;
                     resultMessage = message ?? string.Empty;
 
                     if (sendSuccess)
@@ -144,14 +167,14 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.CyclicTask.Ser
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    success = DeliveryStatus.Failed;
+                    success = DeliveryStatus.CANCELLED;
                     resultMessage = "已取消";
                     _logger?.LogWarning("任务下发被取消 TaskNo={TaskNo}", t.TaskNo);
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    success = DeliveryStatus.Failed;
+                    success = DeliveryStatus.FAILED;
                     resultMessage = ex.Message;
                     _logger?.LogError(ex, "任务下发异常 TaskNo={TaskNo}", t.TaskNo);
                 }

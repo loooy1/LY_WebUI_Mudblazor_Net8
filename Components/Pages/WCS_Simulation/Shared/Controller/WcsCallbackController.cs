@@ -54,30 +54,30 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Control
                 }
 
                 // 精确匹配 Stage 枚举字符串： START / LOAD_FINISH / FINISHED
-                DeliveryStatus mappedStatus = DeliveryStatus.Unknown;
+                DeliveryStatus mappedStatus = DeliveryStatus.UNKNOWN;
                 if (!string.IsNullOrWhiteSpace(stage))
                 {
                     switch (stage.Trim().ToUpperInvariant())
                     {
                         case "START":
-                            mappedStatus = DeliveryStatus.InProgress; // rcs 已开始任务
+                            mappedStatus = DeliveryStatus.ISSUE; // rcs 已开始任务
                             break;
                         case "LOAD_FINISH":
-                            mappedStatus = DeliveryStatus.LoadFinished; // rcs 取货完成
+                            mappedStatus = DeliveryStatus.RCS_PICKUP_FINISHED; // rcs 取货完成
                             break;
                         case "FINISHED":
-                            mappedStatus = DeliveryStatus.Done; // rcs 任务完成
+                            mappedStatus = DeliveryStatus.FINISHED; // rcs 任务完成
                             break;
                         default:
                             var low = stage.Trim().ToLowerInvariant();
                             if (low.Contains("start") || low.Contains("开始"))
-                                mappedStatus = DeliveryStatus.InProgress;
+                                mappedStatus = DeliveryStatus.ISSUE;
                             else if (low.Contains("load") || low.Contains("取货") || low.Contains("load_finish"))
-                                mappedStatus = DeliveryStatus.LoadFinished;
+                                mappedStatus = DeliveryStatus.RCS_PICKUP_FINISHED;
                             else if (low.Contains("finish") || low.Contains("完成"))
-                                mappedStatus = DeliveryStatus.Done;
+                                mappedStatus = DeliveryStatus.FINISHED;
                             else
-                                mappedStatus = DeliveryStatus.Unknown;
+                                mappedStatus = DeliveryStatus.UNKNOWN;
                             break;
                     }
                 }
@@ -101,7 +101,7 @@ namespace LY_WebUI_Mudblazor_net8.Components.Pages.WCS_Simulation.Shared.Control
                         if (idx >= 0)
                         {
                             var old = newList[idx];
-                            var newStatus = mappedStatus != DeliveryStatus.Unknown ? mappedStatus : old.Status;
+                            var newStatus = mappedStatus != DeliveryStatus.UNKNOWN ? mappedStatus : old.Status;
                             var newMsg = string.IsNullOrWhiteSpace(incomingMessage) ? old.Message : incomingMessage;
                             var newRecord = old with { Status = newStatus, Message = newMsg, Time = DateTime.UtcNow };
                             newList[idx] = newRecord;
